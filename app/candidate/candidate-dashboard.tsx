@@ -4,6 +4,7 @@ import type { RecordModel } from "pocketbase";
 import { useEffect, useState } from "react";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 
 type CandidateState = {
   settings: RecordModel;
@@ -88,7 +89,7 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
     setBusy(true);
     setMessage("");
     try {
-      await getBrowserPocketBase().send(path, { method, body });
+      await callLomatonApi(path, { method, body });
       await refresh(success);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo realizar la operación.");

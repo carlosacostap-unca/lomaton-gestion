@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { filterTeams, summarizeSnapshot, teamWarning, type ReportSnapshot, type TeamFilter } from "@/lib/report/hackathon";
 
 const labels: Record<TeamFilter, string> = {
@@ -22,7 +22,7 @@ export function AdminOverview() {
   const load = useCallback(async () => {
     try {
       setError("");
-      setSnapshot(await getBrowserPocketBase().send<ReportSnapshot>("/api/lomaton/admin/report-snapshot", { method: "GET" }));
+      setSnapshot(await callLomatonApi<ReportSnapshot>("/api/lomaton/admin/report-snapshot"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo cargar el tablero.");
     }
@@ -30,7 +30,7 @@ export function AdminOverview() {
 
   useEffect(() => {
     let active = true;
-    getBrowserPocketBase().send<ReportSnapshot>("/api/lomaton/admin/report-snapshot", { method: "GET" })
+    callLomatonApi<ReportSnapshot>("/api/lomaton/admin/report-snapshot")
       .then((data) => { if (active) setSnapshot(data); })
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "No se pudo cargar el tablero."); });
     const refresh = () => void load();

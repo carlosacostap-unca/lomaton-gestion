@@ -1,36 +1,36 @@
 ## 1. Preparación técnica
 
-- [x] 1.1 Confirmar y documentar la URL, versión, montaje de `pb_hooks`/`pb_migrations` y procedimiento de backup de la instancia PocketBase en Dokploy; verificar restaurando o inspeccionando una copia de prueba.
-- [x] 1.2 Leer las guías pertinentes de Next.js 16 incluidas en `node_modules/next/dist/docs/` antes de escribir componentes, Route Handlers o configuración; verificar que las decisiones adoptadas queden anotadas en la documentación técnica del proyecto.
+- [x] 1.1 Documentar la topología local/producción, la separación entre Next.js y PocketBase, la aplicación explícita de esquema mediante MCP y el procedimiento de backup; verificar la copia descargada sin introducir staging.
+- [x] 1.2 Releer las guías pertinentes de Next.js 16 para Route Handlers, autenticación y seguridad de datos antes de trasladar los comandos; verificar que las decisiones queden anotadas en la documentación técnica.
 - [x] 1.3 Agregar y fijar las dependencias para PocketBase, validación, CSV, Excel y fechas con zona horaria; verificar que la instalación, `npm run lint` y `npm run build` finalicen correctamente.
-- [x] 1.4 Definir y validar variables de entorno públicas y privadas sin incluir secretos en el repositorio; verificar que la aplicación falle con un mensaje accionable cuando falte una variable obligatoria.
+- [x] 1.4 Definir y validar las variables públicas de PocketBase y las credenciales privadas de la cuenta técnica, sin incluir secretos ni credenciales `_superusers` en el repositorio; verificar errores accionables ante valores faltantes.
 - [x] 1.5 Establecer la infraestructura de pruebas unitarias, de integración y E2E necesaria para el cambio; verificar ejecutando una prueba mínima de cada nivel configurado.
 
 ## 2. Esquema y seguridad de PocketBase
 
-- [x] 2.1 Crear migraciones versionadas para `users`, `candidates`, `teams`, `team_memberships`, `team_invitations`, `hackathon_settings`, `import_batches` y `audit_logs`; verificar el esquema resultante en una instancia PocketBase limpia.
+- [x] 2.1 Mantener una definición versionada del esquema esperado, incluyendo `service_accounts` y `dataVersion`, y un procedimiento idempotente para aplicarlo mediante MCP; verificar el esquema resultante en producción sin ejecutar migraciones durante un push.
 - [x] 2.2 Agregar índices únicos para email y nombre normalizados, membresía única por candidato e invitaciones pendientes relevantes; verificar con pruebas que PocketBase rechace duplicados y carreras incompatibles.
-- [x] 2.3 Configurar API Rules de mínimo privilegio y bloquear escrituras directas en colecciones gobernadas por comandos; verificar con tokens anónimo, candidato, administrador y superusuario los permisos esperados.
-- [x] 2.4 Implementar hooks de Google OAuth que normalicen el email y vinculen solamente candidatos importados o administradores autorizados; verificar accesos de candidato, administrador, identidad mixta y email no autorizado.
+- [ ] 2.3 Configurar API Rules de mínimo privilegio para que las escrituras gobernadas acepten solamente la cuenta técnica y la `authRule` de `users` autorice emails presentes en padrón o allowlist; verificar tokens anónimo, candidato, administrador, técnico y superusuario.
+- [x] 2.4 Reemplazar los hooks de Google OAuth por la regla de autorización y el Route Handler `/api/lomaton/auth/bootstrap`; verificar accesos de candidato, administrador, identidad mixta y email no autorizado.
 - [x] 2.5 Implementar una forma segura y reproducible de cargar los emails administradores iniciales; verificar que no se requieran credenciales `_superusers` en tiempo de ejecución.
-- [x] 2.6 Implementar el registro inmutable de auditoría para importaciones, cambios de configuración e intervenciones administrativas; verificar que la aplicación pueda leer los registros pero no editarlos ni eliminarlos.
-- [x] 2.7 Probar las operaciones `up` y `down` de las migraciones contra una copia de staging y documentar el resultado; verificar que el rollback no deje colecciones o índices huérfanos.
+- [ ] 2.6 Implementar el registro inmutable de auditoría desde Route Handlers mediante la cuenta técnica; verificar que pueda crear registros pero que ningún usuario o cuenta técnica pueda editarlos ni eliminarlos.
+- [x] 2.7 Validar de forma no destructiva los cambios MCP contra el esquema de producción respaldado y documentar rollback por despliegue anterior o restauración evaluada del backup, sin depender de staging ni de migraciones `down`.
 
 ## 3. Comandos de dominio para equipos
 
-- [x] 3.1 Implementar comandos PocketBase para crear y disolver equipos y para enviar o retirar invitaciones; verificar autorización, plazo, unicidad del nombre y disponibilidad del candidato.
-- [x] 3.2 Implementar comandos para aceptar y rechazar invitaciones dentro de una transacción; verificar que aceptar cree una sola membresía y cancele las restantes invitaciones pendientes.
-- [x] 3.3 Implementar las restricciones transaccionales de un equipo por candidato y máximo cuatro miembros; verificar mediante solicitudes concurrentes que solamente una operación compatible tenga éxito.
-- [x] 3.4 Implementar el recálculo de `draft`, `missing_ftca`, `complete` e `invalid` ante cambios de membresía o FTCA; verificar todos los escenarios de composición definidos en la especificación.
-- [x] 3.5 Implementar comandos administrativos para crear, renombrar, reorganizar y disolver equipos y resolver invitaciones; verificar que respeten las restricciones estructurales y exijan motivo después del cierre.
-- [x] 3.6 Implementar una rutina de reconciliación de estados de equipo; verificar que detecte y corrija una proyección de estado preparada deliberadamente como inconsistente.
+- [ ] 3.1 Implementar Route Handlers de Next.js para crear y disolver equipos y enviar o retirar invitaciones mediante la API Batch; verificar autorización, plazo, unicidad y disponibilidad.
+- [ ] 3.2 Implementar Route Handlers para aceptar y rechazar invitaciones en un lote transaccional; verificar que aceptar cree una sola membresía y cancele las restantes invitaciones pendientes.
+- [ ] 3.3 Implementar restricciones transaccionales de un equipo por candidato y máximo cuatro miembros mediante índices y actualización condicional de contadores; verificar carreras concurrentes.
+- [x] 3.4 Implementar el recálculo de `draft`, `missing_ftca`, `complete` e `invalid` dentro de los lotes que cambian membresía o FTCA; verificar todos los escenarios.
+- [ ] 3.5 Implementar Route Handlers administrativos para crear, renombrar, reorganizar y disolver equipos y resolver invitaciones; verificar restricciones y motivo posterior al cierre.
+- [ ] 3.6 Implementar una ruta de reconciliación de estados mediante lotes acotados; verificar que detecte y corrija una proyección preparada como inconsistente.
 
 ## 4. Acceso con Google y sesión web
 
 - [x] 4.1 Crear el cliente PocketBase para navegador sin compartir estado de autenticación entre solicitudes de servidor; verificar aislamiento mediante pruebas de dos sesiones independientes.
 - [ ] 4.2 Implementar la pantalla de inicio con Google y el flujo OAuth2 de PocketBase; verificar login, cancelación, error del proveedor y cierre de sesión.
 - [x] 4.3 Incorporar la ayuda para usar un correo no Gmail con una cuenta Google y el enlace oficial; verificar que sea accesible antes de iniciar sesión.
-- [x] 4.4 Implementar la carga de identidad y permisos de candidato/administrador y proteger las áreas correspondientes; verificar que cada rol vea solamente las rutas y acciones autorizadas.
+- [ ] 4.4 Integrar el bootstrap posterior a OAuth, refrescar identidad y permisos de candidato/administrador y proteger las áreas correspondientes; verificar que cada rol vea solamente rutas y acciones autorizadas.
 - [x] 4.5 Configurar una política CSP y medidas contra XSS acordes al almacenamiento del token en el navegador; verificar encabezados y ejecutar pruebas con contenido importado no confiable.
 
 ## 5. Padrón e importaciones
@@ -38,40 +38,40 @@
 - [x] 5.1 Implementar normalización y validación compartida de nombre, apellido, email y estado FTCA, incluyendo aliases configurables de columnas; verificar con pruebas de emails, encabezados y valores FTCA variados.
 - [x] 5.2 Implementar el análisis de CSV y Excel con límites configurables de tamaño y filas; verificar archivos válidos, corruptos, vacíos y que excedan límites.
 - [x] 5.3 Crear el Route Handler y la interfaz de previsualización que separan filas válidas, inválidas y pendientes de FTCA; verificar que cancelar no escriba datos.
-- [x] 5.4 Implementar la confirmación del lote y el `upsert` atómico por email normalizado sin eliminar candidatos omitidos; verificar altas, actualizaciones, duplicados y resumen de errores.
-- [x] 5.5 Crear la administración del padrón para buscar y editar candidatos y su estado FTCA; verificar unicidad de email, auditoría y advertencia cuando se invalida un equipo.
-- [x] 5.6 Agregar pruebas de integración de una importación mixta CSV/Excel desde vista previa hasta PocketBase; verificar que el padrón final coincida con las filas confirmadas.
+- [ ] 5.4 Implementar en Next.js la confirmación y el `upsert` transaccional por email normalizado mediante API Batch, sin eliminar candidatos omitidos; verificar altas, actualizaciones, duplicados y resumen.
+- [ ] 5.5 Adaptar la administración del padrón al Route Handler local para editar candidatos y FTCA; verificar unicidad, auditoría y recálculo del equipo afectado.
+- [ ] 5.6 Actualizar las pruebas de integración de importación mixta CSV/Excel para los Route Handlers de Next.js y la cuenta técnica; verificar el padrón final.
 
 ## 6. Experiencia de formación de equipos
 
 - [x] 6.1 Crear el panel del candidato con estado personal, equipo actual, invitaciones recibidas y plazo argentino; verificar sus variantes sin equipo, con invitaciones y con equipo.
-- [x] 6.2 Implementar la creación de equipo con nombre único y la incorporación automática del responsable; verificar errores por nombre duplicado, candidato ocupado y cierre vencido.
-- [x] 6.3 Implementar búsqueda de candidatos disponibles y envío/retiro de invitaciones por el responsable; verificar que no exponga registros no autorizados ni permita duplicados.
-- [x] 6.4 Implementar aceptación y rechazo de invitaciones con actualización inmediata de las demás invitaciones; verificar éxito, cupo agotado y membresía concurrente.
-- [x] 6.5 Mostrar integrantes aceptados, invitaciones pendientes y motivos de equipo incompleto o inválido sin contar invitaciones como miembros; verificar equipos de uno a cuatro integrantes y los tres estados FTCA.
-- [x] 6.6 Implementar la disolución voluntaria y bloquear la expulsión unilateral de miembros aceptados; verificar que los miembros liberados queden nuevamente disponibles.
-- [x] 6.7 Agregar pruebas E2E del flujo completo de varios candidatos formando un equipo válido; verificar que un segundo intento de membresía sea rechazado.
+- [ ] 6.2 Conectar la creación de equipo con el Route Handler local y la incorporación transaccional del responsable; verificar duplicado, candidato ocupado y cierre vencido.
+- [ ] 6.3 Conectar búsqueda, envío y retiro de invitaciones con los Route Handlers locales; verificar privacidad y duplicados.
+- [ ] 6.4 Conectar aceptación y rechazo con los nuevos comandos Batch; verificar éxito, cupo agotado y membresía concurrente.
+- [ ] 6.5 Verificar que la interfaz refleje las proyecciones recalculadas por Next.js sin contar invitaciones como miembros, para uno a cuatro integrantes y los tres estados FTCA.
+- [ ] 6.6 Conectar la disolución voluntaria con el Route Handler local y conservar el bloqueo de expulsión unilateral; verificar liberación de miembros.
+- [ ] 6.7 Actualizar las pruebas E2E del flujo completo para la frontera Next.js/PocketBase revisada; verificar rechazo de una segunda membresía.
 
 ## 7. Administración del hackatón
 
-- [x] 7.1 Crear la configuración administrativa del plazo en `America/Argentina/Buenos_Aires` y del cierre manual; verificar conversión UTC, vencimiento, reapertura y auditoría.
-- [x] 7.2 Aplicar el bloqueo de operaciones de candidatos en todos los comandos de mutación; verificar usando la hora del servidor que ninguna ruta alternativa evite el cierre.
-- [x] 7.3 Crear la interfaz administrativa para formar, editar, reorganizar y disolver equipos y actuar sobre invitaciones; verificar intervenciones normales y posteriores al cierre con motivo.
-- [x] 7.4 Crear alertas y filtros para equipos incompletos o inválidos; verificar que un cambio FTCA se refleje sin requerir recarga manual de datos inconsistentes.
+- [ ] 7.1 Trasladar la configuración del plazo y cierre manual al Route Handler de Next.js; verificar conversión UTC, vencimiento, reapertura y auditoría.
+- [ ] 7.2 Aplicar el bloqueo por hora del servidor en todos los Route Handlers de mutación de candidatos; verificar que ninguna ruta alternativa evite el cierre.
+- [ ] 7.3 Conectar la interfaz administrativa con los Route Handlers locales para equipos e invitaciones; verificar intervenciones normales y posteriores al cierre con motivo.
+- [ ] 7.4 Verificar alertas y filtros contra los estados recalculados por los nuevos comandos; comprobar que un cambio FTCA se refleje de forma consistente.
 - [x] 7.5 Crear la vista de auditoría por entidad y actor; verificar orden cronológico, instantáneas anterior/posterior e inmutabilidad desde la interfaz.
 
 ## 8. Reportes y exportaciones
 
-- [x] 8.1 Crear el tablero administrativo con cantidades y filtros de candidatos, disponibilidad y estados de equipo; verificar cifras contra datos de prueba conocidos.
-- [x] 8.2 Implementar la exportación de candidatos y equipos a CSV; verificar encabezados, Unicode, separadores, comillas y archivos sin filas.
-- [x] 8.3 Implementar la exportación equivalente a Excel; verificar contenido, tipos de celda y apertura correcta en una aplicación compatible.
+- [x] 8.1 Trasladar la instantánea administrativa a Next.js con lectura doble de `dataVersion`; verificar cifras y reintento ante cambios concurrentes.
+- [x] 8.2 Adaptar la exportación CSV a la nueva instantánea local; verificar encabezados, Unicode, separadores, comillas y archivos sin filas.
+- [x] 8.3 Adaptar la exportación Excel a la nueva instantánea local; verificar contenido, tipos de celda y apertura correcta.
 - [x] 8.4 Neutralizar fórmulas en todos los campos exportados y marcar la instantánea con fecha argentina; verificar valores iniciados por `=`, `+`, `-` y `@` y cambios concurrentes durante la exportación.
-- [x] 8.5 Proteger consultas y Route Handlers de reporte para administradores; verificar que tokens anónimos y de candidato reciban una denegación sin datos parciales.
+- [x] 8.5 Proteger consultas y Route Handlers de reporte con validación del token de usuario y cliente técnico separado; verificar denegación sin datos parciales.
 
 ## 9. Verificación y despliegue
 
 - [x] 9.1 Revisar accesibilidad y diseño adaptable de login, candidato y administración; verificar navegación por teclado, etiquetas, estados de foco y tamaños móviles/escritorio.
-- [x] 9.2 Ejecutar pruebas de seguridad sobre control de acceso, manipulación de IDs, archivos maliciosos, XSS y carreras de membresía; verificar que los casos negativos no produzcan cambios persistentes.
-- [x] 9.3 Ejecutar la suite completa, `npm run lint` y `npm run build`; verificar que todos finalicen sin errores ni advertencias nuevas sin justificar.
-- [ ] 9.4 Documentar configuración de Google OAuth2, variables de Next.js, migraciones/hooks PocketBase, backup, rollback y despliegue Dokploy; verificar el procedimiento en staging siguiendo solamente la documentación.
+- [ ] 9.2 Reejecutar pruebas de seguridad sobre la nueva frontera Next.js/PocketBase, cuenta técnica, control de acceso, IDs, archivos, XSS y carreras; verificar ausencia de cambios persistentes en casos negativos.
+- [x] 9.3 Ejecutar la suite completa, `npm run lint` y `npm run build` después del traslado; verificar que finalicen sin errores ni advertencias nuevas sin justificar.
+- [x] 9.4 Documentar Google OAuth2, variables de Next.js, cuenta técnica, cambios PocketBase por MCP, API Batch, backup, rollback y despliegue separado en Dokploy; verificar el procedimiento usando solamente local y producción.
 - [ ] 9.5 Realizar una prueba de aceptación con padrón de muestra que cubra importación, login, equipo válido, intervención posterior al cierre y exportación; verificar cada escenario contra las especificaciones OpenSpec.

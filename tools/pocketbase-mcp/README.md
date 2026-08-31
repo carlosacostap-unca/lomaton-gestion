@@ -1,35 +1,16 @@
 # MCP de PocketBase para Lomatón
 
-Servidor MCP local registrado en Codex como `pocketbase-lomaton-production`.
-Está fijado al host de producción `https://pb-lomaton.epixum.com` y rechaza
-cualquier URL distinta o sin HTTPS.
+Servidor registrado como `pocketbase-lomaton-production`. Rechaza cualquier destino distinto de `https://pb-lomaton.epixum.com`.
 
-## Credenciales
+Las credenciales `_superusers` se leen sólo desde `.env.local` para administrar el esquema mediante MCP. Nunca se versionan ni se copian al runtime Next.js. Las credenciales `POCKETBASE_SERVICE_*` corresponden a la identidad limitada usada por Next.js.
 
-Las credenciales no se guardan en este directorio ni en la configuración global
-de Codex. Deben definirse en el archivo raíz `.env.local`, que está ignorado por
-Git:
+Protecciones:
 
-```dotenv
-POCKETBASE_SUPERUSER_EMAIL=superusuario-de-pocketbase@ejemplo.com
-POCKETBASE_SUPERUSER_PASSWORD=contraseña-del-superusuario
-```
+- `POCKETBASE_ALLOW_WRITES=false` por defecto.
+- `POCKETBASE_ALLOW_DELETES=false` bloquea eliminaciones aunque se habiliten escrituras.
+- `apply_lomaton_schema` es idempotente y no elimina elementos.
+- `ensure_service_account` no devuelve contraseña ni token.
+- `validate_hackathon_schema` valida colecciones y campos.
+- `get_batch_settings`/`update_batch_settings` sólo exponen el bloque Batch.
 
-También puede utilizarse temporalmente `POCKETBASE_SUPERUSER_TOKEN` en lugar del
-email y la contraseña.
-
-No se deben enviar estas credenciales por chat ni incluirlas en `.env.example`.
-
-## Protecciones de producción
-
-- `POCKETBASE_EXPECTED_HOST=pb-lomaton.epixum.com` impide apuntar accidentalmente
-  a otro servidor.
-- `POCKETBASE_ALLOW_WRITES=false` bloquea creaciones y modificaciones.
-- `POCKETBASE_ALLOW_DELETES=false` bloquea eliminaciones incluso si se habilitan
-  las escrituras.
-
-Las escrituras deben habilitarse solamente durante una operación planificada. Las
-eliminaciones requieren habilitar ambos interruptores de forma explícita.
-
-Después de modificar `.env.local` hay que iniciar una nueva tarea de Codex para
-que el servidor MCP vuelva a cargar las credenciales.
+Habilitar escrituras únicamente durante una operación revisada y volver luego a sólo lectura. El detalle operativo y rollback está en `docs/deployment-pocketbase.md`.

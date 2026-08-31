@@ -12,6 +12,22 @@ import {
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 
+async function bootstrapSession() {
+  const pb = getBrowserPocketBase();
+  if (!pb.authStore.token) throw new Error("No existe una sesión para validar.");
+  const response = await fetch("/api/lomaton/auth/bootstrap", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${pb.authStore.token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    pb.authStore.clear();
+    throw new Error("La identidad no está habilitada para este hackatón.");
+  }
+  await pb.collection("users").authRefresh();
+  return pb.authStore.record;
+}
+
 type AuthContextValue = {
   user: RecordModel | null;
   loading: boolean;
@@ -28,12 +44,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const pb = getBrowserPocketBase();
     const update = () => {
-      setUser(pb.authStore.record);
-      setLoading(false);
+      setUser(pb.authStore.record?.enabled ? pb.authStore.record : null);
     };
 
-    update();
-    return pb.authStore.onChange(update);
+    const unsubscribe = pb.authStore.onChange(update);
+    void (async () => {
+      try {
+        if (pb.authStore.isValid) await bootstrapSession();
+        else update();
+      } catch {
+        pb.authStore.clear();
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return unsubscribe;
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
@@ -47,8 +72,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           else window.location.href = url;
         },
       });
+      await bootstrapSession();
+      popup?.close();
     } catch (error) {
       popup?.close();
+      pb.authStore.clear();
       throw error;
     }
   }, []);

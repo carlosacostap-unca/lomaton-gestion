@@ -10,15 +10,17 @@ beforeAll(async () => {
 });
 
 describe("parseServerEnv", () => {
-  it("normaliza administradores y aplica límites predeterminados", () => {
+  it("normaliza la identidad técnica y aplica límites predeterminados", () => {
     expect(
       parseServerEnv({
         POCKETBASE_URL: "https://pocketbase.example.edu.ar",
-        ADMIN_EMAILS: " Admin@Example.edu.ar,otro@example.edu.ar ",
+        POCKETBASE_SERVICE_EMAIL: "Service@Example.edu.ar",
+        POCKETBASE_SERVICE_PASSWORD: "un-secreto-de-prueba",
       }),
     ).toEqual({
       pocketBaseUrl: "https://pocketbase.example.edu.ar",
-      adminEmails: ["admin@example.edu.ar", "otro@example.edu.ar"],
+      pocketBaseServiceEmail: "service@example.edu.ar",
+      pocketBaseServicePassword: "un-secreto-de-prueba",
       importMaxBytes: 5 * 1024 * 1024,
       importMaxRows: 5_000,
     });
@@ -26,7 +28,7 @@ describe("parseServerEnv", () => {
 
   it("informa las variables obligatorias ausentes", () => {
     expect(() => parseServerEnv({})).toThrow(
-      /POCKETBASE_URL.*ADMIN_EMAILS.*\.env\.example.*Dokploy/,
+      /POCKETBASE_URL.*POCKETBASE_SERVICE_EMAIL.*POCKETBASE_SERVICE_PASSWORD.*\.env\.example.*Dokploy/,
     );
   });
 });

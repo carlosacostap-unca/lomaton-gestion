@@ -1,59 +1,42 @@
 # Arquitectura de Lomatón Gestión
 
-## Frontera Next.js 16 y PocketBase
+## Topología confirmada
 
-La aplicación usa Next.js 16 con App Router como interfaz web y PocketBase como backend externo. PocketBase es la fuente de verdad para usuarios, candidatos, equipos, invitaciones, configuración y auditoría.
+Sólo existen dos contextos de ejecución de Next.js: desarrollo local y producción. Ambos usan el PocketBase de producción en `https://pb-lomaton.epixum.com`; no existe staging. Next.js y PocketBase son aplicaciones separadas en Dokploy. Un push a `main` despliega exclusivamente Next.js y nunca modifica el esquema de PocketBase.
 
-La autenticación de PocketBase vive en el navegador porque depende de APIs de cliente, del flujo OAuth2 y del estado local del SDK. Los layouts y páginas permanecen como Server Components por defecto; solamente los providers y superficies interactivas que necesitan estado, eventos o APIs del navegador se declaran Client Components. Esta frontera evita incorporar innecesariamente toda la interfaz al bundle cliente.
+PocketBase 0.40.1 es la fuente de verdad. Los cambios de esquema, API Rules y Settings se aplican de forma explícita mediante el MCP `pocketbase-lomaton-production`, con backup previo y eliminaciones deshabilitadas. La definición esperada está versionada en `tools/pocketbase-mcp/lomaton-schema.mjs`.
 
-Los módulos que contienen secretos o capacidades administrativas deben importar `server-only`. Ningún valor privado puede usar el prefijo `NEXT_PUBLIC_`. La URL pública de PocketBase sí será una variable `NEXT_PUBLIC_`, entendiendo que Next.js fija su valor en el bundle durante `next build`.
+## Frontera de seguridad
 
-## Route Handlers
+El navegador usa el SDK de PocketBase sólo para Google OAuth2, conservar el token del usuario y realizar lecturas permitidas por API Rules. Toda mutación de dominio llama a un Route Handler de Next.js bajo `/api/lomaton/**` o a las rutas locales de importación/exportación.
 
-Los Route Handlers se reservan para operaciones de Backend for Frontend que necesitan procesamiento del lado servidor, principalmente:
+Cada Route Handler:
 
-- analizar y validar archivos CSV/XLSX;
-- preparar descargas CSV/XLSX;
-- aplicar límites de tamaño y formatos de respuesta uniformes.
+1. recibe el token del usuario en `Authorization`;
+2. lo valida con `users/auth-refresh` en un cliente aislado;
+3. comprueba candidato o administrador;
+4. crea otro cliente PocketBase y autentica la colección `service_accounts`;
+5. valida entradas y estado actual;
+6. envía las escrituras relacionadas mediante API Batch.
 
-Cada Route Handler es un endpoint público y debe autenticar y autorizar la solicitud antes de procesarla. Los handlers con datos de usuarios serán dinámicos y no se almacenarán en caché. Los cuerpos se validarán antes de reenviarlos a PocketBase y los errores externos se traducirán sin revelar secretos o detalles internos.
+La cuenta técnica tiene `role=lomaton_server`, `active=true` y reglas de mínimo privilegio. Sus credenciales viven únicamente en `.env.local` y en las variables privadas del despliegue Next.js. El runtime no utiliza `_superusers`.
 
-El token PocketBase llegará en el encabezado `Authorization` y se reenviará solamente durante esa solicitud. No habrá una instancia global del SDK con la sesión de un usuario en el servidor.
+## OAuth y permisos
 
-## Reglas de dominio
+`users` mantiene habilitado sólo Google OAuth2. Su `authRule` exige email verificado y presencia activa en `candidates` o `admin_allowlist`. Después de OAuth, `POST /api/lomaton/auth/bootstrap` sincroniza `candidate`, `isAdmin`, `enabled` y `displayName` usando la cuenta técnica. El cliente refresca la identidad antes de mostrar áreas protegidas.
 
-Next.js no es la autoridad final para las mutaciones de equipos. Las restricciones concurrentes se aplicarán mediante comandos y hooks de PocketBase, respaldados por índices únicos:
+## Integridad concurrente
 
-- un candidato puede pertenecer como máximo a un equipo;
-- un equipo acepta como máximo cuatro integrantes;
-- aceptar una invitación crea una membresía y cancela las demás invitaciones pendientes como una sola operación lógica;
-- el plazo se evalúa con la hora del servidor;
-- las intervenciones administrativas dejan auditoría.
+Los índices únicos impiden dos equipos por candidato, nombres normalizados duplicados e invitaciones pendientes duplicadas. Las incorporaciones actualizan `teams.memberCount` con una precondición `expected_member_count`; si dos solicitudes compiten por el cuarto lugar, una transacción completa falla. Cada Batch incluye membresía, invitaciones, proyección de estado y `hackathon_settings.dataVersion`.
 
-Las validaciones de interfaz mejoran la experiencia, pero nunca sustituyen estas reglas del backend.
+Los reportes leen `dataVersion` antes y después de la instantánea y reintentan si hubo cambios. Importaciones, intervenciones administrativas y configuración incluyen auditoría inmutable en la misma transacción.
 
-## Variables y despliegue
+## Guías de Next.js 16 consultadas
 
-Los archivos `.env.local` no se versionan. El repositorio incluirá `.env.example` sin secretos y una validación explícita de configuración. Las variables públicas se consideran valores de build en Dokploy; si la misma imagen se promueve entre entornos, la URL pública debe establecerse antes de compilar o exponerse mediante un endpoint de configuración en tiempo de ejecución.
-
-La instancia se publica en `https://pb-lomaton.epixum.com` y usa PocketBase 0.40.1. En Dokploy se debe fijar la imagen `adrianmusante/pocketbase:0.40.1`; no se usa `latest` para evitar actualizaciones implícitas. Los artefactos versionados `pb_migrations` y `pb_hooks` se montan respectivamente en `/pocketbase/migrations` y `/pocketbase/hooks`, mientras que `/pocketbase/data` permanece en un volumen persistente. El procedimiento operativo completo está en `docs/deployment-pocketbase.md`.
-
-## Política de seguridad web
-
-La aplicación enviará una Content Security Policy mediante `next.config.ts`. Para conservar páginas estáticas se utilizará inicialmente una política sin nonces, restringida a orígenes propios y al origen HTTPS/WSS de PocketBase en `connect-src`. Desarrollo podrá habilitar únicamente las excepciones que Next.js requiere, como `unsafe-eval`.
-
-Los datos importados se renderizarán como texto de React, sin HTML inyectado. Las exportaciones neutralizarán valores que una hoja de cálculo pueda interpretar como fórmulas.
-
-## Estrategia de pruebas
-
-Vitest cubrirá utilidades síncronas, reglas de dominio y Client Components. Los flujos que dependen de componentes asíncronos, navegación, OAuth simulado y Route Handlers se verificarán con Playwright o pruebas de integración, siguiendo la limitación documentada de Vitest para Server Components asíncronos.
-
-## Guías locales consultadas
-
-- `node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md`
 - `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`
-- `node_modules/next/dist/docs/01-app/02-guides/backend-for-frontend.md`
-- `node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md`
-- `node_modules/next/dist/docs/01-app/02-guides/environment-variables.md`
-- `node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`
-- `node_modules/next/dist/docs/01-app/02-guides/testing/playwright.md`
+- `node_modules/next/dist/docs/01-app/02-guides/authentication.md`
+- `node_modules/next/dist/docs/01-app/02-guides/data-security.md`
+- `node_modules/next/dist/docs/01-app/02-guides/server-and-client-boundary.md`
+- `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md`
+
+Las decisiones resultantes son: parámetros de rutas esperados como promesas, autenticación y autorización dentro de cada handler, módulos privados con `server-only`, validación de todo dato externo, DTOs limitados y ausencia de clientes globales con sesión de usuario.

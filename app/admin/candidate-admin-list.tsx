@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { RecordModel } from "pocketbase";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 
 export function CandidateAdminList() {
   const [query, setQuery] = useState("");
@@ -37,8 +38,7 @@ export function CandidateAdminList() {
     setLoading(true);
     setMessage("");
     try {
-      const pb = getBrowserPocketBase();
-      const result = await pb.send(`/api/lomaton/admin/candidates/${selected.id}`, {
+      const result = await callLomatonApi<{ warning?: string }>(`/api/lomaton/admin/candidates/${selected.id}`, {
         method: "PATCH",
         body: {
           firstName: formData.get("firstName"),

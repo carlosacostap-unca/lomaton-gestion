@@ -5,6 +5,14 @@ import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 
+import {
+  batchSettings,
+  collectionRulePatches,
+  dataVersionField,
+  expectedFields,
+  serviceAccountsCollection,
+} from "./lomaton-schema.mjs";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..", "..");
@@ -22,19 +30,10 @@ const ALLOW_DELETES = process.env.POCKETBASE_ALLOW_DELETES === "true";
 
 assertProductionTarget();
 
-let authAttempted = false;
+let authPromise = null;
 let pbInstance = null;
 
-const expectedCollections = [
-  "users",
-  "candidates",
-  "teams",
-  "team_memberships",
-  "team_invitations",
-  "hackathon_settings",
-  "import_batches",
-  "audit_logs",
-];
+const expectedCollections = Object.keys(expectedFields);
 
 const tools = [
   tool("health", "Comprueba la disponibilidad del PocketBase de producción.", {}),
@@ -81,6 +80,15 @@ const tools = [
   tool("delete_collection", "Elimina una colección. Requiere habilitar escrituras y eliminaciones.", {
     collection: stringProperty("Nombre o id de la colección."),
   }, ["collection"]),
+  tool("get_batch_settings", "Consulta solamente la configuración de API Batch.", {}),
+  tool("update_batch_settings", "Actualiza solamente la configuración de API Batch. Requiere POCKETBASE_ALLOW_WRITES=true.", {
+    enabled: { type: "boolean" },
+    maxRequests: { type: "number", minimum: 1, maximum: 20000 },
+    timeout: { type: "number", minimum: 1, maximum: 300 },
+    maxBodySize: { type: "number", minimum: 0 },
+  }),
+  tool("apply_lomaton_schema", "Aplica de forma idempotente el esquema, reglas y Batch API de Lomatón sin eliminar colecciones, campos ni registros. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
+  tool("ensure_service_account", "Crea o sincroniza la cuenta técnica usando POCKETBASE_SERVICE_EMAIL y POCKETBASE_SERVICE_PASSWORD, sin devolver el secreto. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("validate_hackathon_schema", "Compara las colecciones existentes con el esquema esperado de Lomatón.", {}),
 ];
 
@@ -178,16 +186,98 @@ const handlers = {
     return { deleted: true, collection: args.collection };
   },
 
-  async validate_hackathon_schema() {
-    const collections = await (await authenticate()).collections.getFullList({ sort: "name" });
-    const names = new Set(collections.map((collection) => collection.name));
-    const missing = expectedCollections.filter((name) => !names.has(name));
-    return {
-      ok: missing.length === 0,
-      required: expectedCollections,
-      present: expectedCollections.filter((name) => names.has(name)),
-      missing,
+  async get_batch_settings() {
+    const settings = await (await authenticate()).settings.getAll();
+    return { batch: settings.batch || null };
+  },
+
+  async update_batch_settings(args) {
+    requireWrites();
+    const pb = await authenticate();
+    const current = await pb.settings.getAll();
+    const next = { ...current.batch, ...pick(args, ["enabled", "maxRequests", "timeout", "maxBodySize"]) };
+    const updated = await pb.settings.update({ batch: next });
+    return { batch: updated.batch };
+  },
+
+  async apply_lomaton_schema() {
+    requireWrites();
+    const pb = await authenticate();
+    let collections = await pb.collections.getFullList({ sort: "name" });
+    const byName = new Map(collections.map((collection) => [collection.name, collection]));
+    const actions = [];
+
+    if (!byName.has("service_accounts")) {
+      const created = await pb.collections.create(serviceAccountsCollection);
+      byName.set(created.name, created);
+      actions.push("created:service_accounts");
+    }
+
+    for (const [name, rules] of Object.entries(collectionRulePatches)) {
+      const current = byName.get(name);
+      if (!current) throw rpcError(-32020, `Falta la colección requerida antes de aplicar reglas: ${name}`);
+      const patch = { ...rules };
+      if (name === "hackathon_settings") {
+        const hasDataVersion = current.fields?.some((field) => field.name === "dataVersion");
+        if (!hasDataVersion) patch.fields = [...current.fields, dataVersionField];
+      }
+      await pb.collections.update(current.id, patch);
+      actions.push(`updated:${name}`);
+    }
+
+    const currentSettings = await pb.settings.getAll();
+    await pb.settings.update({ batch: { ...currentSettings.batch, ...batchSettings } });
+    actions.push("updated:batch_settings");
+
+    return { actions, ...(await validateSchema(pb)) };
+  },
+
+  async ensure_service_account() {
+    requireWrites();
+    const email = process.env.POCKETBASE_SERVICE_EMAIL?.trim().toLowerCase();
+    const password = process.env.POCKETBASE_SERVICE_PASSWORD;
+    if (!email || !password || password.length < 12) {
+      throw rpcError(
+        -32021,
+        "Configura POCKETBASE_SERVICE_EMAIL y POCKETBASE_SERVICE_PASSWORD (mínimo 12 caracteres) en el archivo de entorno del MCP.",
+      );
+    }
+
+    const pb = await authenticate();
+    const collection = pb.collection("service_accounts");
+    const filter = pb.filter("email = {:email}", { email });
+    let existing = null;
+    try {
+      existing = await collection.getFirstListItem(filter);
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+    }
+
+    const data = {
+      email,
+      emailVisibility: false,
+      verified: true,
+      active: true,
+      role: "lomaton_server",
+      password,
+      passwordConfirm: password,
     };
+    const record = existing
+      ? await collection.update(existing.id, data)
+      : await collection.create(data);
+
+    return {
+      created: !existing,
+      id: record.id,
+      email: record.email,
+      verified: record.verified,
+      active: record.active,
+      role: record.role,
+    };
+  },
+
+  async validate_hackathon_schema() {
+    return validateSchema(await authenticate());
   },
 };
 
@@ -262,22 +352,50 @@ async function dispatch(message) {
 
 async function authenticate() {
   const pb = await getPocketBase();
-  if (authAttempted) return pb;
-  authAttempted = true;
+  if (!authPromise) {
+    authPromise = (async () => {
+      const token = process.env.POCKETBASE_SUPERUSER_TOKEN || process.env.POCKETBASE_ADMIN_TOKEN;
+      if (token) {
+        pb.authStore.save(token, null);
+        return pb;
+      }
 
-  const token = process.env.POCKETBASE_SUPERUSER_TOKEN || process.env.POCKETBASE_ADMIN_TOKEN;
-  if (token) {
-    pb.authStore.save(token, null);
-    return pb;
+      const identity = process.env.POCKETBASE_SUPERUSER_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
+      const password = process.env.POCKETBASE_SUPERUSER_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD;
+      if (identity && password) {
+        await pb.collection("_superusers").authWithPassword(identity, password);
+      }
+      return pb;
+    })().catch((error) => {
+      authPromise = null;
+      throw error;
+    });
   }
-
-  const identity = process.env.POCKETBASE_SUPERUSER_EMAIL || process.env.POCKETBASE_ADMIN_EMAIL;
-  const password = process.env.POCKETBASE_SUPERUSER_PASSWORD || process.env.POCKETBASE_ADMIN_PASSWORD;
-  if (identity && password) {
-    await pb.collection("_superusers").authWithPassword(identity, password);
-  }
-
+  await authPromise;
   return pb;
+}
+
+async function validateSchema(pb) {
+  const collections = await pb.collections.getFullList({ sort: "name" });
+  const byName = new Map(collections.map((collection) => [collection.name, collection]));
+  const missing = expectedCollections.filter((name) => !byName.has(name));
+  const missingFields = {};
+
+  for (const [name, fields] of Object.entries(expectedFields)) {
+    const collection = byName.get(name);
+    if (!collection) continue;
+    const presentFields = new Set(collection.fields?.map((field) => field.name));
+    const absent = fields.filter((field) => !presentFields.has(field));
+    if (absent.length) missingFields[name] = absent;
+  }
+
+  return {
+    ok: missing.length === 0 && Object.keys(missingFields).length === 0,
+    required: expectedCollections,
+    present: expectedCollections.filter((name) => byName.has(name)),
+    missing,
+    missingFields,
+  };
 }
 
 async function getPocketBase() {

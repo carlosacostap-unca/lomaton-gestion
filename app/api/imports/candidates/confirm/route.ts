@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { requirePocketBaseAdmin } from "@/lib/pocketbase/server";
+import { confirmCandidateImport } from "@/lib/import/confirm-candidates";
+import {
+  createPocketBaseServiceClient,
+  requirePocketBaseAdmin,
+} from "@/lib/pocketbase/server";
+import { ApiError, errorResponse } from "@/lib/server/api-error";
 
 export const runtime = "nodejs";
 
@@ -24,7 +29,7 @@ const requestSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { env, authorization } = await requirePocketBaseAdmin(
+    const { env, user } = await requirePocketBaseAdmin(
       request.headers.get("authorization"),
     );
     const parsed = requestSchema.safeParse(await request.json());
@@ -35,16 +40,13 @@ export async function POST(request: Request) {
       return Response.json({ error: `La confirmación supera ${env.importMaxRows} filas.` }, { status: 400 });
     }
 
-    const response = await fetch(`${env.pocketBaseUrl}/api/lomaton/admin/import-candidates`, {
-      method: "POST",
-      headers: { Authorization: authorization, "Content-Type": "application/json" },
-      body: JSON.stringify(parsed.data),
-      cache: "no-store",
-    });
-    const data = await response.json();
-    return Response.json(data, { status: response.status });
+    if (parsed.data.rows.length === 0) {
+      return errorResponse(new ApiError(400, "No hay filas válidas para importar.", "empty_import"));
+    }
+    const pb = await createPocketBaseServiceClient();
+    const result = await confirmCandidateImport(pb, user, parsed.data);
+    return Response.json(result, { status: 201 });
   } catch (error) {
-    if (error instanceof Response) return error;
-    return Response.json({ error: "No se pudo confirmar la importación." }, { status: 500 });
+    return errorResponse(error);
   }
 }

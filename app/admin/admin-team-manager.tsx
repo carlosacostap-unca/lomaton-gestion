@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import type { ReportSnapshot, SnapshotRecord } from "@/lib/report/hackathon";
 
 function candidateName(candidate: SnapshotRecord | undefined) {
@@ -16,12 +16,12 @@ export function AdminTeamManager() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    setSnapshot(await getBrowserPocketBase().send<ReportSnapshot>("/api/lomaton/admin/report-snapshot", { method: "GET" }));
+    setSnapshot(await callLomatonApi<ReportSnapshot>("/api/lomaton/admin/report-snapshot"));
   }, []);
 
   useEffect(() => {
     let active = true;
-    getBrowserPocketBase().send<ReportSnapshot>("/api/lomaton/admin/report-snapshot", { method: "GET" })
+    callLomatonApi<ReportSnapshot>("/api/lomaton/admin/report-snapshot")
       .then((data) => { if (active) setSnapshot(data); })
       .catch(() => { if (active) setMessage("No se pudieron cargar los equipos."); });
     const refresh = () => void load();
@@ -33,7 +33,7 @@ export function AdminTeamManager() {
     setBusy(true);
     setMessage("");
     try {
-      await getBrowserPocketBase().send(path, { method, body: { ...body, reason } });
+      await callLomatonApi(path, { method, body: { ...body, reason } });
       await load();
       window.dispatchEvent(new Event("lomaton:data-changed"));
       setMessage(success);

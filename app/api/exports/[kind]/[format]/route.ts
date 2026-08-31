@@ -4,8 +4,13 @@ import {
   exportXlsx,
   type ExportRow,
 } from "@/lib/export/hackathon";
-import { requirePocketBaseAdmin } from "@/lib/pocketbase/server";
+import {
+  createPocketBaseServiceClient,
+  requirePocketBaseAdmin,
+} from "@/lib/pocketbase/server";
 import { teamWarning, type ReportSnapshot, type SnapshotRecord } from "@/lib/report/hackathon";
+import { readConsistentReportSnapshot } from "@/lib/report/snapshot";
+import { errorResponse } from "@/lib/server/api-error";
 
 export const runtime = "nodejs";
 
@@ -18,13 +23,10 @@ export async function GET(
     if (!["candidates", "teams"].includes(kind) || !["csv", "xlsx"].includes(format)) {
       return Response.json({ error: "Exportación no encontrada." }, { status: 404 });
     }
-    const { env, authorization } = await requirePocketBaseAdmin(request.headers.get("authorization"));
-    const snapshotResponse = await fetch(`${env.pocketBaseUrl}/api/lomaton/admin/report-snapshot`, {
-      headers: { Authorization: authorization },
-      cache: "no-store",
-    });
-    if (!snapshotResponse.ok) throw new Error("No se pudo obtener una instantánea del reporte.");
-    const snapshot = (await snapshotResponse.json()) as ReportSnapshot;
+    await requirePocketBaseAdmin(request.headers.get("authorization"));
+    const snapshot = (await readConsistentReportSnapshot(
+      await createPocketBaseServiceClient(),
+    )) as ReportSnapshot;
     const generatedAt = new Date(snapshot.generatedAtUtc);
     if (Number.isNaN(generatedAt.getTime())) throw new Error("La instantánea no tiene una fecha válida.");
     let rows: ExportRow[];
@@ -102,7 +104,6 @@ export async function GET(
       },
     });
   } catch (error) {
-    if (error instanceof Response) return error;
-    return Response.json({ error: error instanceof Error ? error.message : "No se pudo exportar." }, { status: 500 });
+    return errorResponse(error);
   }
 }

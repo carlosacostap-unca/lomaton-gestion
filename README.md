@@ -4,7 +4,7 @@ Aplicación Next.js 16 para importar el padrón del hackatón, autenticar partic
 
 ## Desarrollo
 
-1. Copiar `.env.example` a `.env.local` y ajustar las URLs si se usa una instancia local.
+1. Copiar `.env.example` a `.env.local`. El desarrollo local usa el PocketBase de producción confirmado.
 2. Instalar dependencias con `npm install`.
 3. Iniciar con `npm run dev`.
 4. Abrir <http://localhost:3000>.
@@ -19,7 +19,7 @@ npm run test:e2e
 npm run build
 ```
 
-Las pruebas que escriben en PocketBase requieren las variables `PB_INTEGRATION_URL`/`PB_INTEGRATION_ADMIN_TOKEN` o `PB_E2E_BASE_URL`/`PB_E2E_SUPERUSER_IDENTITY`/`PB_E2E_SUPERUSER_PASSWORD`; sin ellas quedan omitidas. Se ejecutan exclusivamente contra una instancia local o de staging que incluya el hook de soporte ignorado bajo `.tools/`, nunca contra producción.
+Las pruebas externas que podrían escribir datos quedan omitidas salvo configuración y autorización explícitas. La suite normal usa utilidades puras y dobles de prueba; no modifica PocketBase.
 
 ## OpenSpec
 
@@ -34,4 +34,4 @@ Los artefactos están en `openspec/changes/gestionar-hackaton/`.
 
 ## Despliegue
 
-Consultar `docs/deployment-pocketbase.md` para backup, staging, migraciones, hooks, Google OAuth2, variables de Dokploy y rollback. No aplicar migraciones en producción sin un backup restaurado y verificado previamente.
+Consultar `docs/deployment-pocketbase.md` para backup, MCP, Google OAuth2, variables de Dokploy y rollback. Un push a `main` despliega solamente Next.js; el esquema de PocketBase cambia exclusivamente mediante una operación MCP explícita.

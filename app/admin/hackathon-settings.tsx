@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { RecordModel } from "pocketbase";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { argentinaInputToUtc, utcToArgentinaInput } from "@/lib/time/argentina";
 
 export function HackathonSettings() {
@@ -24,7 +25,7 @@ export function HackathonSettings() {
     setMessage("");
     try {
       const deadlineLocal = String(formData.get("deadlineLocal") ?? "");
-      const updated = await getBrowserPocketBase().send<RecordModel>("/api/lomaton/admin/settings", {
+      const updated = await callLomatonApi<RecordModel>("/api/lomaton/admin/settings", {
         method: "PATCH",
         body: {
           deadlineUtc: argentinaInputToUtc(deadlineLocal),
