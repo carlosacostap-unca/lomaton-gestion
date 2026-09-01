@@ -14,6 +14,7 @@ import {
   mentorProfilesCollection,
   registrationsCollection,
   serviceAccountsCollection,
+  studentCertificatesCollection,
 } from "./lomaton-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -231,6 +232,19 @@ const handlers = {
       const created = await pb.collections.create(mentorProfilesCollection(registrations.id));
       byName.set(created.name, created);
       actions.push("created:mentor_profiles");
+    }
+
+    if (!byName.has("student_certificates")) {
+      const candidatesCollection = byName.get("candidates");
+      const usersCollection = byName.get("users");
+      if (!candidatesCollection || !usersCollection) {
+        throw rpcError(-32020, "Faltan candidates o users antes de crear student_certificates.");
+      }
+      const created = await pb.collections.create(
+        studentCertificatesCollection(candidatesCollection.id, usersCollection.id),
+      );
+      byName.set(created.name, created);
+      actions.push("created:student_certificates");
     }
 
     const candidates = byName.get("candidates");

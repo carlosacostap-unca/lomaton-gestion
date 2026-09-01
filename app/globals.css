@@ -97,6 +97,11 @@ th { color: var(--green); font-size: .8rem; text-transform: uppercase; }
 .danger-button { margin-top: 1.5rem; padding: .7rem 1rem; border: 1px solid #a43d13; border-radius: .65rem; background: transparent; color: #8f310d; cursor: pointer; font-weight: 800; }
 .export-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
 .export-grid > div { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; padding: 1rem; border-radius: .8rem; background: #eef2e7; }
+.certificate-card { margin-block: 1rem; }
+.certificate-metadata { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; padding: .9rem; margin-block: .75rem; border-radius: .75rem; background: #eef2e7; }
+.certificate-metadata strong { overflow-wrap: anywhere; }
+.certificate-admin { border: 1px solid #d9d5c7; border-radius: .75rem; padding: 1rem; }
+.certificate-admin legend { font-weight: 700; padding-inline: .35rem; }
 .export-grid strong { grid-column: 1 / -1; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .team-admin-grid { display: grid; gap: 1rem; margin-top: 1rem; }

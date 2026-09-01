@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
+import { AdminCertificatePanel } from "./admin-certificate-panel";
 
 type TriState = "yes" | "no" | "not_provided";
 type RegistrationRecord = {
@@ -24,6 +25,7 @@ type RegistrationRecord = {
   mediaAuthorized: TriState;
   candidateActive: boolean;
   mentorActive: boolean;
+  candidateId: string;
 };
 
 type RegistrationList = { items: RegistrationRecord[]; totalItems: number };
@@ -152,6 +154,9 @@ export function CandidateAdminList() {
           <label>Integrantes declarados<textarea name="declaredTeamMembers" defaultValue={selected.declaredTeamMembers} rows={3} /></label>
           <label>Bases y condiciones<select name="termsAccepted" defaultValue={selected.termsAccepted}><option value="yes">Aceptadas</option><option value="no">No aceptadas</option><option value="not_provided">No informado</option></select></label>
           <label>Uso de imagen y voz<select name="mediaAuthorized" defaultValue={selected.mediaAuthorized}><option value="yes">Autorizado</option><option value="no">No autorizado</option><option value="not_provided">No informado</option></select></label>
+          {selected.relationship === "teacher" || !selected.candidateId
+            ? <fieldset className="certificate-admin"><legend>Certificado de alumno regular</legend><p className="muted">No corresponde a un perfil docente.</p></fieldset>
+            : <AdminCertificatePanel key={selected.candidateId} candidateId={selected.candidateId} />}
           <label className="check-label"><input name="active" type="checkbox" defaultChecked={selectedActive(selected)} /> Perfil activo</label>
           <label>Motivo<textarea name="reason" rows={2} placeholder="Obligatorio si la formación está cerrada" /></label>
           <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setSelected(null)}>Cancelar</button><button className="primary-button" disabled={loading}>Guardar</button></div>

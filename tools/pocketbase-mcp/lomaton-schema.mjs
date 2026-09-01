@@ -12,6 +12,7 @@ export const expectedFields = {
     "sourceRole", "sourceRowNumber", "rawSource", "reviewStatus", "importBatch",
   ],
   candidates: ["registration", "fullName", "firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
+  student_certificates: ["candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy"],
   mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
   teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
@@ -63,6 +64,13 @@ export const collectionRulePatches = {
     createRule: technicalRule,
     updateRule: technicalRule,
     deleteRule: null,
+  },
+  student_certificates: {
+    listRule: technicalRule,
+    viewRule: technicalRule,
+    createRule: technicalRule,
+    updateRule: `${technicalRule} && (@request.query.expected_sha256 = "" || sha256 = @request.query.expected_sha256)`,
+    deleteRule: technicalRule,
   },
   mentor_profiles: {
     listRule: adminOrTechnicalRule,
@@ -259,6 +267,49 @@ export function candidateProjectionFields(registrationsCollectionId) {
       cascadeDelete: false,
     },
   ];
+}
+
+export const certificateStructuralMaxBytes = 10 * 1024 * 1024;
+
+export function studentCertificatesCollection(candidatesCollectionId, usersCollectionId) {
+  return {
+    name: "student_certificates",
+    type: "base",
+    ...collectionRulePatches.student_certificates,
+    fields: [
+      {
+        name: "candidate",
+        type: "relation",
+        required: true,
+        collectionId: candidatesCollectionId,
+        maxSelect: 1,
+        cascadeDelete: true,
+      },
+      {
+        name: "certificate",
+        type: "file",
+        required: true,
+        maxSelect: 1,
+        maxSize: certificateStructuralMaxBytes,
+        mimeTypes: ["application/pdf"],
+        protected: true,
+      },
+      { name: "originalName", type: "text", required: true, max: 240 },
+      { name: "sizeBytes", type: "number", required: true, min: 1, max: certificateStructuralMaxBytes, onlyInt: true },
+      { name: "sha256", type: "text", required: true, min: 64, max: 64, pattern: "^[a-f0-9]{64}$" },
+      {
+        name: "uploadedBy",
+        type: "relation",
+        required: true,
+        collectionId: usersCollectionId,
+        maxSelect: 1,
+        cascadeDelete: false,
+      },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_student_certificates_candidate ON student_certificates (candidate)",
+    ],
+  };
 }
 
 export const batchSettings = {

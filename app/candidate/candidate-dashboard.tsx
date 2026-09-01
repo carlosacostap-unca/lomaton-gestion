@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
+import { StudentCertificateCard } from "./student-certificate-card";
 
 type CandidateState = {
   settings: RecordModel;
@@ -113,6 +114,7 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
         <span className={formationOpen ? "status-open" : "status-closed"}>{formationOpen ? "Formación abierta" : "Formación cerrada"}</span>
       </section>
       {message ? <div className="alert" role="status">{message}</div> : null}
+      <StudentCertificateCard />
 
       {!state.team ? (
         <div className="dashboard-grid">

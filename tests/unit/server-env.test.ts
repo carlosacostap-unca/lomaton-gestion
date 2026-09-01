@@ -23,7 +23,19 @@ describe("parseServerEnv", () => {
       pocketBaseServicePassword: "un-secreto-de-prueba",
       importMaxBytes: 5 * 1024 * 1024,
       importMaxRows: 5_000,
+      certificateMaxBytes: 10 * 1024 * 1024,
     });
+  });
+
+  it("acepta un límite de certificado positivo hasta 10 MiB", () => {
+    const base = {
+      POCKETBASE_URL: "https://pocketbase.example.edu.ar",
+      POCKETBASE_SERVICE_EMAIL: "service@example.edu.ar",
+      POCKETBASE_SERVICE_PASSWORD: "un-secreto-de-prueba",
+    };
+    expect(parseServerEnv({ ...base, LOMATON_CERTIFICATE_MAX_BYTES: "2097152" }).certificateMaxBytes).toBe(2 * 1024 * 1024);
+    expect(() => parseServerEnv({ ...base, LOMATON_CERTIFICATE_MAX_BYTES: "-1" })).toThrow(/LOMATON_CERTIFICATE_MAX_BYTES/);
+    expect(() => parseServerEnv({ ...base, LOMATON_CERTIFICATE_MAX_BYTES: String(10 * 1024 * 1024 + 1) })).toThrow(/LOMATON_CERTIFICATE_MAX_BYTES/);
   });
 
   it("informa las variables obligatorias ausentes", () => {

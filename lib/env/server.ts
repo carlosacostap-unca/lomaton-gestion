@@ -2,12 +2,20 @@ import "server-only";
 
 import { z } from "zod";
 
+export const CERTIFICATE_STRUCTURAL_MAX_BYTES = 10 * 1024 * 1024;
+
 const serverEnvSchema = z.object({
   POCKETBASE_URL: z.url(),
   POCKETBASE_SERVICE_EMAIL: z.email(),
   POCKETBASE_SERVICE_PASSWORD: z.string().min(12),
   IMPORT_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
   IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(5_000),
+  LOMATON_CERTIFICATE_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(CERTIFICATE_STRUCTURAL_MAX_BYTES)
+    .default(CERTIFICATE_STRUCTURAL_MAX_BYTES),
 });
 
 export type ServerEnv = {
@@ -16,6 +24,7 @@ export type ServerEnv = {
   pocketBaseServicePassword: string;
   importMaxBytes: number;
   importMaxRows: number;
+  certificateMaxBytes: number;
 };
 
 export function parseServerEnv(input: Record<string, string | undefined>): ServerEnv {
@@ -37,6 +46,7 @@ export function parseServerEnv(input: Record<string, string | undefined>): Serve
     pocketBaseServicePassword: result.data.POCKETBASE_SERVICE_PASSWORD,
     importMaxBytes: result.data.IMPORT_MAX_BYTES,
     importMaxRows: result.data.IMPORT_MAX_ROWS,
+    certificateMaxBytes: result.data.LOMATON_CERTIFICATE_MAX_BYTES,
   };
 }
 
@@ -47,5 +57,6 @@ export function getServerEnv(): ServerEnv {
     POCKETBASE_SERVICE_PASSWORD: process.env.POCKETBASE_SERVICE_PASSWORD,
     IMPORT_MAX_BYTES: process.env.IMPORT_MAX_BYTES,
     IMPORT_MAX_ROWS: process.env.IMPORT_MAX_ROWS,
+    LOMATON_CERTIFICATE_MAX_BYTES: process.env.LOMATON_CERTIFICATE_MAX_BYTES,
   });
 }

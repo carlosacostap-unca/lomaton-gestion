@@ -23,14 +23,14 @@ Las pruebas externas que podrían escribir datos quedan omitidas salvo configura
 
 ## OpenSpec
 
-El cambio activo es `gestionar-hackaton`. Para consultar o continuar su implementación:
+El cambio activo es `subir-certificado-alumno-regular`. Para consultar o continuar su implementación:
 
 ```text
-openspec status --change gestionar-hackaton
-openspec instructions apply --change gestionar-hackaton
+openspec status --change subir-certificado-alumno-regular
+openspec instructions apply --change subir-certificado-alumno-regular
 ```
 
-Los artefactos están en `openspec/changes/gestionar-hackaton/`.
+Los artefactos están en `openspec/changes/subir-certificado-alumno-regular/`.
 
 ## Despliegue
 
