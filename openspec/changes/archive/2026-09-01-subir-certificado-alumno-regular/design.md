@@ -72,11 +72,11 @@ La búsqueda administrativa agregará disponibilidad y descarga dentro del detal
 
 ## Migration Plan
 
-1. Confirmar un backup reciente y mantener deshabilitadas por defecto las eliminaciones del MCP. Por decisión operativa posterior, las escrituras permanecen habilitadas.
+1. Confirmar un backup reciente. Por decisión operativa posterior, las escrituras y eliminaciones del MCP permanecen habilitadas.
 2. Extender la definición versionada con `student_certificates`, su índice, campo protegido y reglas; aplicar el cambio aditivo y validar el esquema en producción.
 3. Verificar con un PDF ficticio que PocketBase escribe en iDrive E2 y que ningún token anónimo, candidato o administrador puede leer directamente la colección o el archivo.
 4. Configurar `LOMATON_CERTIFICATE_MAX_BYTES` y el límite de cuerpo del proxy sin agregar credenciales de iDrive E2 a Next.js.
-5. Desplegar Next.js, probar carga, reemplazo, descarga propia, descarga administrativa, rechazos y auditoría; habilitar eliminaciones sólo para retirar los datos ficticios y volver a `POCKETBASE_ALLOW_DELETES=false`, conservando escrituras habilitadas según la decisión del operador.
+5. Desplegar Next.js, probar carga, reemplazo, descarga propia, descarga administrativa, rechazos y auditoría; retirar los datos ficticios mediante MCP y conservar escrituras y eliminaciones habilitadas según la decisión explícita del operador.
 
 Ante una falla del frontend se revertirá Next.js al commit anterior y se conservará la colección aditiva con sus archivos. Si el problema está en las reglas o el campo, se corregirá hacia adelante mediante MCP; no se eliminarán certificados reales como parte de un rollback automático.
 

@@ -32,15 +32,15 @@ No configurar en Next.js access keys, secretos, bucket ni endpoint de iDrive E2.
 
 ## Cambios de PocketBase mediante MCP
 
-El MCP está bloqueado a HTTPS y al host productivo. Por decisión operativa, las escrituras permanecen habilitadas; las eliminaciones permanecen bloqueadas. Para un cambio planificado:
+El MCP está bloqueado a HTTPS y al host productivo. Por decisión operativa explícita, las escrituras y eliminaciones permanecen habilitadas. Para un cambio planificado:
 
 1. crear y descargar un backup nativo desde PocketBase;
 2. revisar `tools/pocketbase-mcp/lomaton-schema.mjs`;
-3. comprobar que `POCKETBASE_ALLOW_WRITES=true` y `POCKETBASE_ALLOW_DELETES=false`;
+3. comprobar que `POCKETBASE_ALLOW_WRITES=true` y `POCKETBASE_ALLOW_DELETES=true`;
 4. ejecutar `apply_lomaton_schema`;
 5. ejecutar `ensure_service_account` sólo si se crea o sincroniza la identidad técnica;
 6. ejecutar `validate_hackathon_schema` y `get_batch_settings`;
-7. verificar nuevamente que las eliminaciones continúen deshabilitadas.
+7. revisar los objetivos exactos antes de cualquier eliminación, ya que el MCP conserva ese permiso.
 
 Para habilitar certificados, `apply_lomaton_schema` crea aditivamente `student_certificates` con un único registro por candidato, PDF protegido de hasta 10 MiB y reglas exclusivas para `lomaton_server`. Después se debe comprobar que el acceso anónimo y los tokens humanos de candidato o administrador reciben denegación al intentar acceder directamente a registros o archivos. Los flujos válidos pasan siempre por los Route Handlers de Next.js.
 
@@ -62,4 +62,4 @@ Antes de enviar a `main`, ejecutar `npm run typecheck`, `npm run lint`, `npm tes
 
 Para revertir código, seleccionar el despliegue anterior de Next.js o revertir el commit. Para un problema de esquema, detener escrituras, evaluar el alcance y restaurar el backup sólo si la corrección aditiva no es segura. Restaurar PocketBase reemplaza datos posteriores al backup, por lo que no es el primer mecanismo de rollback.
 
-La colección documental es una migración aditiva: ante un rollback de Next.js se conserva cerrada y no afecta equipos. No eliminar automáticamente la colección ni certificados reales. Para una aceptación se puede cargar un PDF ficticio, comprobar carga, reemplazo y ambas descargas, habilitar eliminaciones sólo para retirar ese registro, validar la línea base y volver a `POCKETBASE_ALLOW_DELETES=false`. `POCKETBASE_ALLOW_WRITES` permanece en `true` por decisión explícita del operador.
+La colección documental es una migración aditiva: ante un rollback de Next.js se conserva cerrada y no afecta equipos. No eliminar automáticamente la colección ni certificados reales. Para una aceptación se puede cargar un PDF ficticio, comprobar carga, reemplazo y ambas descargas, eliminar únicamente los registros E2E identificados y validar la línea base. `POCKETBASE_ALLOW_WRITES` y `POCKETBASE_ALLOW_DELETES` permanecen en `true` por decisión explícita del operador.

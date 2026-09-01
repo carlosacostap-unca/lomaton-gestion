@@ -3,7 +3,7 @@
 - [x] 1.1 Releer las guías de Next.js 16 pertinentes a Route Handlers, `FormData`, límites de cuerpos y respuestas en streaming; verificar que las decisiones aplicables queden reflejadas en la implementación o documentación técnica.
 - [x] 1.2 Incorporar `LOMATON_CERTIFICATE_MAX_BYTES` a la configuración privada con valor predeterminado de 10 MiB y tope estructural equivalente; verificar valores válidos, ausentes, negativos y superiores al máximo mediante pruebas unitarias.
 - [x] 1.3 Extender la definición versionada de PocketBase con `student_certificates`, archivo PDF único y protegido, metadatos, índice único y reglas exclusivas para la cuenta técnica; verificar el esquema esperado con las pruebas de contrato del MCP.
-- [ ] 1.4 Aplicar aditivamente la colección en producción mediante MCP después de confirmar el backup y validar que los tokens anónimo, candidato y administrador no puedan leer ni escribir directamente registros o archivos protegidos.
+- [x] 1.4 Aplicar aditivamente la colección en producción mediante MCP después de confirmar el backup y validar que los tokens anónimo, candidato y administrador no puedan leer ni escribir directamente registros o archivos protegidos.
 
 ## 2. Dominio y API de certificados
 
@@ -25,5 +25,5 @@
 
 - [x] 4.1 Documentar el límite de carga de Next.js y Dokploy, la colección protegida, el uso indirecto de iDrive E2, el procedimiento MCP y el rollback aditivo; verificar que no se agreguen credenciales del storage al entorno de Next.js.
 - [x] 4.2 Ejecutar pruebas unitarias, integración, E2E, privacidad y carreras, además de `npm run lint` y `npm run build`; verificar que finalicen sin errores ni advertencias nuevas sin justificar.
-- [ ] 4.3 Desplegar Next.js y realizar en producción una aceptación con un PDF ficticio que cubra carga, reemplazo, descarga propia, descarga administrativa y rechazos; verificar que el objeto se almacene mediante PocketBase/iDrive E2.
-- [ ] 4.4 Eliminar mediante MCP el certificado ficticio y sus datos de prueba, comprobar la línea base, volver a deshabilitar eliminaciones y conservar escrituras habilitadas según la decisión operativa explícita.
+- [x] 4.3 Desplegar Next.js y realizar en producción una aceptación con un PDF ficticio que cubra carga, reemplazo, descarga propia, descarga administrativa y rechazos; verificar que el objeto se almacene mediante PocketBase/iDrive E2.
+- [x] 4.4 Eliminar mediante MCP el certificado ficticio y sus datos de prueba, comprobar la línea base y conservar escrituras y eliminaciones habilitadas según la decisión operativa explícita.
