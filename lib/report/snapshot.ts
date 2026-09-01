@@ -15,7 +15,7 @@ export async function readConsistentReportSnapshot(
       .getFirstListItem(pb.filter("key = {:key}", { key: "default" }));
     const version = Number(before.dataVersion ?? 0);
     const [candidates, teams, memberships, invitations] = await Promise.all([
-      pb.collection("candidates").getFullList({ sort: "lastName,firstName" }),
+      pb.collection("candidates").getFullList({ sort: "fullName" }),
       pb.collection("teams").getFullList({ sort: "name" }),
       pb.collection("team_memberships").getFullList({ sort: "created" }),
       pb.collection("team_invitations").getFullList({ sort: "created" }),

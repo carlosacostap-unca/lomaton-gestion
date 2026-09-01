@@ -4,7 +4,11 @@ La organización del hackatón necesita convertir un padrón previo de personas 
 
 ## What Changes
 
-- Incorporar un padrón de candidatos desde archivos CSV o Excel, con previsualización, validación, actualización por email y reporte de filas inválidas.
+- Incorporar las respuestas del formulario de inscripción desde archivos CSV o Excel, con previsualización, validación, deduplicación por identidad y reporte de filas inválidas o contradictorias.
+- Conservar nombre completo, DNI, teléfono, email, vínculo institucional, datos académicos, declaración previa de equipo y consentimientos, manteniendo los datos personales sensibles restringidos al área administrativa.
+- Clasificar a las personas inscriptas como candidatos estudiantes o docentes mentores, sin habilitar a los docentes para integrar equipos en esta primera versión.
+- Interpretar `Estudiante FTYCA` y el valor histórico `Estudiante` como pertenencia FTCA confirmada, excepto cuando una respuesta complete simultáneamente ramas FTCA y externa, caso que requiere revisión administrativa; interpretar `Estudiante externo` como no perteneciente a FTCA.
+- Preservar la declaración textual de equipos proveniente del formulario solamente como antecedente administrativo, sin crear membresías ni evitar la aceptación de invitaciones.
 - Registrar la pertenencia a la Facultad de Tecnología y Ciencias Aplicadas (FTCA) como un estado administrable: confirmado, no pertenece o pendiente de validación.
 - Permitir el acceso con Google únicamente a candidatos importados y administradores autorizados, incluyendo ayuda para asociar una dirección no Gmail a una cuenta Google.
 - Permitir que un candidato cree un equipo borrador, invite compañeros y gestione las invitaciones recibidas.
@@ -21,7 +25,7 @@ La organización del hackatón necesita convertir un padrón previo de personas 
 
 ### New Capabilities
 
-- `candidate-roster`: Importación, validación, actualización y administración del padrón de candidatos y su estado FTCA.
+- `candidate-roster`: Importación, validación, deduplicación y administración privada de inscripciones, con proyecciones operativas para candidatos, docentes mentores y estado FTCA.
 - `google-access`: Autenticación con Google, autorización por email importado y acceso administrativo autorizado.
 - `team-formation`: Creación de equipos borrador, invitaciones, aceptación y reglas de composición y exclusividad.
 - `hackathon-administration`: Configuración del plazo, bloqueo operativo, intervención administrativa y auditoría.
@@ -39,4 +43,6 @@ No hay capacidades existentes que deban modificarse.
 - El esquema, los índices, las reglas y los registros técnicos de PocketBase se administrarán explícitamente mediante MCP y no mediante hooks o migraciones ejecutados en cada despliegue.
 - Las mutaciones de servidor utilizarán una identidad técnica de mínimo privilegio y la API Batch transaccional de PocketBase, sin exponer credenciales de superusuario en el navegador ni en tiempo de ejecución.
 - Se agregarán dependencias para el SDK de PocketBase y para leer y generar archivos CSV y Excel.
+- El modelo persistente separará los datos privados de inscripción de los datos mínimos necesarios para formar equipos y registrará por separado los perfiles de docentes mentores.
+- La interfaz administrativa incorporará una revisión explícita de respuestas contradictorias, emails inválidos y duplicados con cambios antes de confirmar la importación.
 - La configuración de despliegue de Next.js requerirá la URL pública de PocketBase, una credencial técnica limitada y valores seguros exclusivamente del lado servidor; OAuth2 de Google seguirá configurado en PocketBase.

@@ -73,7 +73,7 @@ describe("admin export Route Handler", () => {
     expect(response.headers.get("content-type")).toContain("text/csv");
     expect(response.headers.get("x-generated-at-argentina")).toBeTruthy();
     expect(await response.text()).toContain(
-      "Ana,Pérez,ana@example.com,confirmed,true,disponible",
+      "Ana Pérez,ana@example.com,confirmed,true,disponible",
     );
     expect(mocks.readSnapshot).toHaveBeenCalledTimes(1);
   });

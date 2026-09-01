@@ -19,6 +19,10 @@ import {
   withdrawInvitation,
 } from "@/lib/domain/team-commands";
 import {
+  listAdminRegistrations,
+  updateAdminRegistration,
+} from "@/lib/domain/registration-admin";
+import {
   createPocketBaseServiceClient,
   requirePocketBaseAdmin,
   requirePocketBaseUser,
@@ -59,6 +63,25 @@ const candidateUpdateSchema = z.object({
   active: z.boolean(),
   reason: z.string().max(1000).default(""),
 });
+const registrationUpdateSchema = z.object({
+  fullName: z.string().trim().min(1).max(240),
+  dni: z.string().trim().min(5).max(30),
+  phone: z.string().trim().min(5).max(50),
+  email: z.email().max(254),
+  relationship: z.enum(["student_ftca", "student_external", "teacher"]),
+  ftcaStatus: z.enum(["confirmed", "not_ftca", "pending"]),
+  department: z.string().max(240).default(""),
+  academicUnit: z.string().max(240).default(""),
+  career: z.string().max(240).default(""),
+  externalTeacherDescription: z.string().max(1000).default(""),
+  mentorInterest: z.enum(["yes", "no", "not_provided"]),
+  declaredTeamStatus: z.enum(["complete", "none", "partial", "not_provided"]),
+  declaredTeamMembers: z.string().max(2000).default(""),
+  termsAccepted: z.enum(["yes", "no", "not_provided"]),
+  mediaAuthorized: z.enum(["yes", "no", "not_provided"]),
+  active: z.boolean(),
+  reason: z.string().max(1000).default(""),
+});
 
 async function body(request: Request) {
   try {
@@ -87,6 +110,10 @@ export async function GET(request: Request, routeContext: Context) {
     if (path.length === 2 && path[0] === "admin" && path[1] === "report-snapshot") {
       return Response.json(await readConsistentReportSnapshot(pb));
     }
+    if (path.length === 2 && path[0] === "admin" && path[1] === "registrations") {
+      const query = new URL(request.url).searchParams.get("query") ?? "";
+      return Response.json(await listAdminRegistrations(pb, query));
+    }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
     return errorResponse(error);
@@ -108,6 +135,10 @@ export async function PATCH(request: Request, routeContext: Context) {
     if (path.length === 3 && path[0] === "admin" && path[1] === "candidates") {
       const input = candidateUpdateSchema.parse(await body(request));
       return Response.json(await updateAdminCandidate(pb, user, path[2], input));
+    }
+    if (path.length === 3 && path[0] === "admin" && path[1] === "registrations") {
+      const input = registrationUpdateSchema.parse(await body(request));
+      return Response.json(await updateAdminRegistration(pb, user, path[2], input));
     }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {

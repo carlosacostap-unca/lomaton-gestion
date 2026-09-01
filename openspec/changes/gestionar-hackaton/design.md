@@ -4,6 +4,8 @@ El repositorio contiene una aplicación Next.js 16 App Router, React 19 y TypeSc
 
 La aplicación PocketBase de producción no se reconstruye ni se actualiza ante cada push del repositorio. El esquema y la configuración se administran mediante operaciones MCP explícitas y auditables. La lógica autoritativa se despliega con Next.js y usa las APIs de PocketBase con una identidad técnica limitada; las invariantes concurrentes se preservan mediante índices, contadores y la API Batch transaccional.
 
+El padrón real proviene de una exportación de Google Forms con ramas para estudiantes FTCA, estudiantes externos y docentes. Incluye DNI, teléfono, datos académicos, consentimientos y declaraciones textuales de equipos, por lo que la importación debe separar información privada de los datos operativos visibles durante la formación.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -14,6 +16,8 @@ La aplicación PocketBase de producción no se reconstruye ni se actualiza ante 
 - Mantener una definición versionada del esquema esperado y aplicar sus cambios explícitamente mediante MCP, sin acoplarla al despliegue de Next.js.
 - Ejecutar la lógica de negocio autoritativa en Route Handlers de Next.js y conservar las escrituras compuestas como transacciones PocketBase.
 - Mantener operaciones privilegiadas y secretos fuera del navegador.
+- Separar las respuestas privadas de inscripción de las proyecciones mínimas utilizadas por candidatos y equipos.
+- Importar de forma reproducible las variantes históricas del formulario, detectando duplicados y contradicciones antes de persistir.
 
 **Non-Goals:**
 
@@ -21,6 +25,7 @@ La aplicación PocketBase de producción no se reconstruye ni se actualiza ante 
 - Proveer autenticación local con contraseña o recuperar contraseñas.
 - Reemplazar la administración de infraestructura, copias de seguridad o actualizaciones de PocketBase en el VPS.
 - Automatizar comunicaciones por correo, mensajería o notificaciones push en esta primera versión.
+- Asignar mentores a equipos o habilitar a los docentes para integrar equipos en esta primera versión.
 - Implementar múltiples hackatones simultáneos; la primera versión administra una única edición activa.
 
 ## Decisions
@@ -50,7 +55,9 @@ Alternativa considerada: mantener una autenticación Google separada en Next.js.
 El esquema esperado se conservará versionado como referencia operativa y se aplicará a PocketBase mediante MCP:
 
 - `users` (auth): email, relación opcional a `candidates` y permiso administrativo.
-- `candidates`: nombre, apellido, email original, email normalizado, estado FTCA y estado operativo.
+- `registrations`: respuesta privada vigente con fecha de envío, nombre completo, DNI y teléfono normalizados, email, vínculo institucional, datos académicos, declaración previa de equipo, consentimientos, valores de origen y estado de revisión.
+- `candidates`: relación a la inscripción, nombre completo, email original, email normalizado, estado FTCA y estado operativo; no replica DNI, teléfono ni consentimientos.
+- `mentor_profiles`: relación a la inscripción docente, departamento o descripción institucional externa e interés de mentoría.
 - `teams`: nombre, nombre normalizado, candidato responsable y estado de conformación.
 - `team_memberships`: relaciones a equipo y candidato, origen de incorporación y momento de alta.
 - `team_invitations`: equipo, candidato invitado, emisor, estado y fechas de resolución.
@@ -62,6 +69,8 @@ El esquema esperado se conservará versionado como referencia operativa y se apl
 Los índices únicos cubrirán email normalizado, nombre de equipo normalizado, candidato en `team_memberships` y pares relevantes de invitaciones. `hackathon_settings` incluirá `dataVersion`, incrementado dentro de cada lote de mutación para detectar cambios concurrentes durante reportes. Las restricciones de base y las actualizaciones condicionales de contadores reducen carreras incluso si se reciben solicitudes simultáneas.
 
 Alternativa considerada: guardar los miembros como una relación múltiple dentro de `teams`. Se descarta porque dificulta la unicidad global por candidato, la auditoría y las operaciones concurrentes.
+
+Alternativa considerada: guardar todos los campos importados directamente en `candidates`. Se descarta para reducir la exposición de DNI, teléfono, consentimientos y respuestas académicas en consultas destinadas a la formación de equipos.
 
 ### 4. Comandos críticos ejecutados por Next.js sobre API Batch
 
@@ -93,7 +102,15 @@ La lista inicial de administradores se cargará mediante MCP en `admin_allowlist
 
 ### 8. Importaciones en dos fases y actualización por email
 
-El Route Handler analizará CSV/XLSX, normalizará encabezados y valores y devolverá una vista previa firmada o reproducible. Al confirmar, construirá un lote PocketBase que hará `upsert` por email normalizado, registrará la importación, la auditoría y el incremento de versión. Las filas inválidas no se aplicarán y la omisión de un candidato no provocará bajas.
+El Route Handler analizará CSV/XLSX, reconocerá los encabezados reales de Google Forms y transformará cada respuesta en un registro canónico. Conservará `Apellido y nombres` como nombre completo, sin intentar separar automáticamente nombre y apellido, y normalizará email, DNI, teléfono, fechas y opciones textuales sin perder los valores originales necesarios para auditoría.
+
+La clasificación aplicará estas reglas deterministas: `Estudiante FTYCA` será candidato FTCA confirmado; el valor histórico `Estudiante` también será FTCA confirmado cuando no haya datos de la rama externa; `Estudiante externo` será candidato no FTCA; y `Docente` generará un perfil de mentor sin acceso de candidato. Una respuesta que complete simultáneamente ramas FTCA y externa quedará bloqueada hasta revisión administrativa.
+
+La deduplicación comparará email y DNI normalizados. Los reenvíos idénticos se agruparán; ante reenvíos con cambios se propondrá la respuesta de fecha más reciente y se mostrarán las diferencias para confirmación; las combinaciones incompatibles de email y DNI no se fusionarán automáticamente. Un email inválido podrá corregirse en la vista previa y disparará nuevamente todas las validaciones.
+
+La vista previa será firmada o reproducible y distinguirá registros válidos, inválidos, duplicados y pendientes de revisión. Al confirmar, el sistema construirá un lote PocketBase que hará `upsert` de la inscripción privada y de su proyección como candidato o mentor, registrará la importación, la auditoría y el incremento de versión. Las filas inválidas o no resueltas no se aplicarán y la omisión de una persona en una importación posterior no provocará bajas.
+
+El estado y los integrantes declarados en el formulario se conservarán únicamente en `registrations` como antecedente administrativo. Nunca crearán equipos, membresías o invitaciones automáticas.
 
 No se almacenará el archivo completo salvo que aparezca un requisito posterior de archivo documental. Esto minimiza datos duplicados y riesgos de retención.
 
@@ -112,22 +129,25 @@ Route Handlers autenticados consultarán directamente PocketBase con la identida
 - [PocketBase continúa evolucionando antes de su versión 1.0] -> Mantener fija la versión 0.40.1 y revisar compatibilidad antes de cualquier actualización explícita.
 - [La edición de FTCA puede invalidar equipos cerca del cierre] -> Recalcular inmediatamente, mostrar alertas administrativas y conservar auditoría.
 - [Importaciones grandes pueden superar límites HTTP o memoria] -> Definir límites de tamaño y filas, procesar con validación incremental y devolver errores accionables.
+- [Los datos privados de inscripción podrían exponerse en búsquedas o reportes operativos] -> Mantenerlos en una colección con reglas administrativas, proyectar sólo campos mínimos y probar respuestas para candidatos no administradores.
+- [Una deduplicación incorrecta podría fusionar personas distintas] -> Exigir coincidencia coherente de email y DNI, mostrar diferencias y bloquear conflictos en vez de resolverlos silenciosamente.
+- [El nombre completo no permite separar con certeza nombres y apellidos] -> Conservar el valor original y habilitar corrección administrativa sin inferencias automáticas.
 
 ## Migration Plan
 
 1. Mantener el backup descargado de PocketBase antes de cambios estructurales o de reglas.
 2. Aplicar mediante MCP los cambios aditivos de esquema, reglas, configuración Batch, cuenta técnica y datos iniciales.
-3. Configurar en Next.js la URL de PocketBase y la credencial técnica como variables privadas, sin credenciales `_superusers`.
-4. Ejecutar localmente las pruebas unitarias, de integración, E2E, lint y build.
-5. Hacer push a `main` para desplegar únicamente Next.js.
-6. Ejecutar en producción las pruebas de login, importación, concurrencia de invitaciones, plazo, intervención administrativa y exportación.
-7. Habilitar el acceso general una vez validado el padrón inicial.
+3. Verificar mediante MCP que `registrations` y `mentor_profiles` sean privadas, y que `candidates` exponga solamente la proyección mínima requerida.
+4. Configurar en Next.js la URL de PocketBase y la credencial técnica como variables privadas, sin credenciales `_superusers`.
+5. Ejecutar localmente las pruebas unitarias, de integración, E2E, lint y build.
+6. Hacer push a `main` para desplegar únicamente Next.js.
+7. Ejecutar en producción las pruebas de login, importación, concurrencia de invitaciones, plazo, intervención administrativa y exportación.
+8. Habilitar el acceso general una vez validado el padrón inicial.
 
 Ante una falla del frontend se revierte el despliegue de Next.js al commit anterior. Los cambios aditivos de PocketBase se corrigen hacia adelante mediante MCP; solamente se restaura el backup cuando el impacto y la posible pérdida de acciones posteriores hayan sido evaluados explícitamente.
 
 ## Open Questions
 
-- Nombres reales de las columnas del archivo de inscripción para definir aliases de importación.
 - Límites operativos definitivos de tamaño de archivo, cantidad de candidatos y cantidad máxima de operaciones Batch.
 - Procedimiento y periodicidad de rotación de la credencial técnica de Next.js.
 

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
+import { candidateDisplayName } from "@/lib/domain/candidate-name";
 import type { ReportSnapshot, SnapshotRecord } from "@/lib/report/hackathon";
 
 function candidateName(candidate: SnapshotRecord | undefined) {
-  return candidate ? `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim() : "Candidato";
+  return candidateDisplayName(candidate);
 }
 
 export function AdminTeamManager() {

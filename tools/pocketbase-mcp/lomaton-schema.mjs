@@ -4,7 +4,15 @@ export const technicalRule =
 export const expectedFields = {
   users: ["candidate", "displayName", "isAdmin", "enabled"],
   service_accounts: ["active", "role"],
-  candidates: ["firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
+  registrations: [
+    "submittedAt", "fullName", "dni", "dniNormalized", "phone", "phoneNormalized",
+    "email", "emailNormalized", "relationship", "ftcaStatus", "department",
+    "academicUnit", "career", "externalTeacherDescription", "mentorInterest",
+    "declaredTeamStatus", "declaredTeamMembers", "termsAccepted", "mediaAuthorized",
+    "sourceRole", "sourceRowNumber", "rawSource", "reviewStatus", "importBatch",
+  ],
+  candidates: ["registration", "fullName", "firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
+  mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
   teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
   team_memberships: ["team", "candidate", "source"],
@@ -42,9 +50,23 @@ export const collectionRulePatches = {
     manageRule: null,
     authRule: 'verified = true && active = true && role = "lomaton_server"',
   },
+  registrations: {
+    listRule: adminOrTechnicalRule,
+    viewRule: adminOrTechnicalRule,
+    createRule: technicalRule,
+    updateRule: technicalRule,
+    deleteRule: null,
+  },
   candidates: {
     listRule: authenticatedReadRule,
     viewRule: authenticatedReadRule,
+    createRule: technicalRule,
+    updateRule: technicalRule,
+    deleteRule: null,
+  },
+  mentor_profiles: {
+    listRule: adminOrTechnicalRule,
+    viewRule: adminOrTechnicalRule,
     createRule: technicalRule,
     updateRule: technicalRule,
     deleteRule: null,
@@ -127,6 +149,117 @@ export const dataVersionField = {
   min: 0,
   onlyInt: true,
 };
+
+const triStateValues = ["yes", "no", "not_provided"];
+
+export function registrationsCollection(importBatchesCollectionId) {
+  return {
+    name: "registrations",
+    type: "base",
+    ...collectionRulePatches.registrations,
+    fields: [
+      { name: "submittedAt", type: "date", required: false },
+      { name: "fullName", type: "text", required: true, max: 240 },
+      { name: "dni", type: "text", required: true, max: 40 },
+      { name: "dniNormalized", type: "text", required: true, max: 20 },
+      { name: "phone", type: "text", required: true, max: 80 },
+      { name: "phoneNormalized", type: "text", required: true, max: 30 },
+      { name: "email", type: "email", required: true },
+      { name: "emailNormalized", type: "text", required: true, max: 254 },
+      {
+        name: "relationship",
+        type: "select",
+        required: true,
+        maxSelect: 1,
+        values: ["student_ftca", "student_external", "teacher"],
+      },
+      {
+        name: "ftcaStatus",
+        type: "select",
+        required: true,
+        maxSelect: 1,
+        values: ["confirmed", "not_ftca", "pending"],
+      },
+      { name: "department", type: "text", required: false, max: 240 },
+      { name: "academicUnit", type: "text", required: false, max: 240 },
+      { name: "career", type: "text", required: false, max: 240 },
+      { name: "externalTeacherDescription", type: "text", required: false, max: 2000 },
+      { name: "mentorInterest", type: "select", required: true, maxSelect: 1, values: triStateValues },
+      {
+        name: "declaredTeamStatus",
+        type: "select",
+        required: true,
+        maxSelect: 1,
+        values: ["complete", "none", "partial", "not_provided"],
+      },
+      { name: "declaredTeamMembers", type: "text", required: false, max: 4000 },
+      { name: "termsAccepted", type: "select", required: true, maxSelect: 1, values: triStateValues },
+      { name: "mediaAuthorized", type: "select", required: true, maxSelect: 1, values: triStateValues },
+      { name: "sourceRole", type: "text", required: true, max: 120 },
+      { name: "sourceRowNumber", type: "number", required: true, min: 2, onlyInt: true },
+      { name: "rawSource", type: "json", required: false },
+      {
+        name: "reviewStatus",
+        type: "select",
+        required: true,
+        maxSelect: 1,
+        values: ["ready", "needs_review"],
+      },
+      {
+        name: "importBatch",
+        type: "relation",
+        required: true,
+        collectionId: importBatchesCollectionId,
+        maxSelect: 1,
+        cascadeDelete: false,
+      },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_registrations_email_normalized ON registrations (emailNormalized)",
+      "CREATE UNIQUE INDEX idx_registrations_dni_normalized ON registrations (dniNormalized)",
+      "CREATE INDEX idx_registrations_relationship ON registrations (relationship)",
+    ],
+  };
+}
+
+export function mentorProfilesCollection(registrationsCollectionId) {
+  return {
+    name: "mentor_profiles",
+    type: "base",
+    ...collectionRulePatches.mentor_profiles,
+    fields: [
+      {
+        name: "registration",
+        type: "relation",
+        required: true,
+        collectionId: registrationsCollectionId,
+        maxSelect: 1,
+        cascadeDelete: false,
+      },
+      { name: "department", type: "text", required: false, max: 240 },
+      { name: "externalDescription", type: "text", required: false, max: 2000 },
+      { name: "mentorInterest", type: "select", required: true, maxSelect: 1, values: triStateValues },
+      { name: "active", type: "bool", required: false },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_mentor_profiles_registration ON mentor_profiles (registration)",
+    ],
+  };
+}
+
+export function candidateProjectionFields(registrationsCollectionId) {
+  return [
+    { name: "fullName", type: "text", required: false, max: 240 },
+    {
+      name: "registration",
+      type: "relation",
+      required: false,
+      collectionId: registrationsCollectionId,
+      maxSelect: 1,
+      cascadeDelete: false,
+    },
+  ];
+}
 
 export const batchSettings = {
   enabled: true,

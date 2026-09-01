@@ -9,6 +9,7 @@ import {
   requirePocketBaseAdmin,
 } from "@/lib/pocketbase/server";
 import { teamWarning, type ReportSnapshot, type SnapshotRecord } from "@/lib/report/hackathon";
+import { candidateDisplayName } from "@/lib/domain/candidate-name";
 import { readConsistentReportSnapshot } from "@/lib/report/snapshot";
 import { errorResponse } from "@/lib/server/api-error";
 
@@ -39,8 +40,7 @@ export async function GET(
         const membership = byCandidate.get(candidate.id);
         const team = membership ? teams.get(String(membership.team)) : undefined;
         return {
-          nombre: String(candidate.firstName ?? ""),
-          apellido: String(candidate.lastName ?? ""),
+          nombre_completo: candidateDisplayName(candidate),
           email: String(candidate.email ?? ""),
           estado_ftca: String(candidate.ftcaStatus ?? ""),
           activo: Boolean(candidate.active),
@@ -49,7 +49,7 @@ export async function GET(
         };
       });
       columns = [
-        { key: "nombre", header: "Nombre" }, { key: "apellido", header: "Apellido" },
+        { key: "nombre_completo", header: "Nombre completo", width: 36 },
         { key: "email", header: "Email", width: 32 }, { key: "estado_ftca", header: "Estado FTCA" },
         { key: "activo", header: "Activo" }, { key: "disponibilidad", header: "Disponibilidad" },
         { key: "equipo", header: "Equipo", width: 28 },
@@ -68,7 +68,7 @@ export async function GET(
         estado: String(team.status ?? ""),
         integrantes: Number(team.memberCount ?? 0),
         ftca_confirmados: Number(team.ftcaConfirmedCount ?? 0),
-        miembros: (byTeam.get(team.id) ?? []).map((candidate) => `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim()).join(" | "),
+        miembros: (byTeam.get(team.id) ?? []).map(candidateDisplayName).join(" | "),
         emails: (byTeam.get(team.id) ?? []).map((candidate) => String(candidate.email ?? "")).join(" | "),
         condiciones_ftca: (byTeam.get(team.id) ?? []).map((candidate) => String(candidate.ftcaStatus ?? "")).join(" | "),
         advertencias: teamWarning(team),

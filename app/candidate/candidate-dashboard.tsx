@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
+import { candidateDisplayName } from "@/lib/domain/candidate-name";
 
 type CandidateState = {
   settings: RecordModel;
@@ -53,7 +54,7 @@ async function loadState(candidateId: string): Promise<CandidateState> {
   }
 
   const [candidates, memberships] = await Promise.all([
-    pb.collection("candidates").getFullList({ filter: "active=true", sort: "lastName,firstName" }),
+    pb.collection("candidates").getFullList({ filter: "active=true", sort: "fullName" }),
     pb.collection("team_memberships").getFullList(),
   ]);
   const occupied = new Set(memberships.map((item) => String(item.candidate)));
@@ -64,7 +65,7 @@ async function loadState(candidateId: string): Promise<CandidateState> {
 }
 
 function candidateName(record: RecordModel | undefined) {
-  return record ? `${record.firstName || ""} ${record.lastName || ""}`.trim() : "Candidato";
+  return candidateDisplayName(record);
 }
 
 export function CandidateDashboard({ candidateId }: { candidateId: string }) {

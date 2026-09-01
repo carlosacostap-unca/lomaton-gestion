@@ -7,9 +7,12 @@ import { fileURLToPath } from "node:url";
 
 import {
   batchSettings,
+  candidateProjectionFields,
   collectionRulePatches,
   dataVersionField,
   expectedFields,
+  mentorProfilesCollection,
+  registrationsCollection,
   serviceAccountsCollection,
 } from "./lomaton-schema.mjs";
 
@@ -212,6 +215,51 @@ const handlers = {
       byName.set(created.name, created);
       actions.push("created:service_accounts");
     }
+
+    if (!byName.has("registrations")) {
+      const importBatches = byName.get("import_batches");
+      if (!importBatches) {
+        throw rpcError(-32020, "Falta import_batches antes de crear registrations.");
+      }
+      const created = await pb.collections.create(registrationsCollection(importBatches.id));
+      byName.set(created.name, created);
+      actions.push("created:registrations");
+    }
+
+    if (!byName.has("mentor_profiles")) {
+      const registrations = byName.get("registrations");
+      const created = await pb.collections.create(mentorProfilesCollection(registrations.id));
+      byName.set(created.name, created);
+      actions.push("created:mentor_profiles");
+    }
+
+    const candidates = byName.get("candidates");
+    const registrations = byName.get("registrations");
+    if (!candidates || !registrations) {
+      throw rpcError(-32020, "Faltan candidates o registrations para crear la proyección.");
+    }
+    const candidateFields = candidates.fields.map((field) =>
+      ["firstName", "lastName"].includes(field.name)
+        ? { ...field, required: false }
+        : field
+    );
+    for (const field of candidateProjectionFields(registrations.id)) {
+      if (!candidateFields.some((current) => current.name === field.name)) {
+        candidateFields.push(field);
+      }
+    }
+    const candidateIndexes = [...(candidates.indexes || [])];
+    if (!candidateIndexes.some((index) => index.includes("idx_candidates_registration"))) {
+      candidateIndexes.push(
+        "CREATE UNIQUE INDEX idx_candidates_registration ON candidates (registration) WHERE registration != ''",
+      );
+    }
+    const updatedCandidates = await pb.collections.update(candidates.id, {
+      fields: candidateFields,
+      indexes: candidateIndexes,
+    });
+    byName.set("candidates", updatedCandidates);
+    actions.push("updated:candidates_projection");
 
     for (const [name, rules] of Object.entries(collectionRulePatches)) {
       const current = byName.get(name);

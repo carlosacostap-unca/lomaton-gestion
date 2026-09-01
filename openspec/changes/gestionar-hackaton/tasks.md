@@ -15,6 +15,7 @@
 - [x] 2.5 Implementar una forma segura y reproducible de cargar los emails administradores iniciales; verificar que no se requieran credenciales `_superusers` en tiempo de ejecución.
 - [ ] 2.6 Implementar el registro inmutable de auditoría desde Route Handlers mediante la cuenta técnica; verificar que pueda crear registros pero que ningún usuario o cuenta técnica pueda editarlos ni eliminarlos.
 - [x] 2.7 Validar de forma no destructiva los cambios MCP contra el esquema de producción respaldado y documentar rollback por despliegue anterior o restauración evaluada del backup, sin depender de staging ni de migraciones `down`.
+- [x] 2.8 Extender mediante MCP el esquema esperado con `registrations`, `mentor_profiles` y la relación privada hacia `candidates`, incluyendo índices de identidad y reglas de mínimo privilegio; verificar que candidatos anónimos o autenticados no puedan leer DNI, teléfono, consentimientos ni respuestas académicas.
 
 ## 3. Comandos de dominio para equipos
 
@@ -38,9 +39,13 @@
 - [x] 5.1 Implementar normalización y validación compartida de nombre, apellido, email y estado FTCA, incluyendo aliases configurables de columnas; verificar con pruebas de emails, encabezados y valores FTCA variados.
 - [x] 5.2 Implementar el análisis de CSV y Excel con límites configurables de tamaño y filas; verificar archivos válidos, corruptos, vacíos y que excedan límites.
 - [x] 5.3 Crear el Route Handler y la interfaz de previsualización que separan filas válidas, inválidas y pendientes de FTCA; verificar que cancelar no escriba datos.
-- [ ] 5.4 Implementar en Next.js la confirmación y el `upsert` transaccional por email normalizado mediante API Batch, sin eliminar candidatos omitidos; verificar altas, actualizaciones, duplicados y resumen.
-- [ ] 5.5 Adaptar la administración del padrón al Route Handler local para editar candidatos y FTCA; verificar unicidad, auditoría y recálculo del equipo afectado.
-- [ ] 5.6 Actualizar las pruebas de integración de importación mixta CSV/Excel para los Route Handlers de Next.js y la cuenta técnica; verificar el padrón final.
+- [x] 5.4 Implementar el adaptador de encabezados y ramas reales de Google Forms, conservando nombre completo y valores de origen; verificar estudiantes FTYCA, el valor histórico `Estudiante`, estudiantes externos, docentes y respuestas con ramas contradictorias.
+- [x] 5.5 Implementar normalización y deduplicación conjunta por email y DNI, selección propuesta de la respuesta más reciente, comparación de cambios y bloqueo de identidades incompatibles; verificar reenvíos idénticos, modificados y conflictos cruzados.
+- [x] 5.6 Ampliar la vista previa administrativa para mostrar clasificación, campos privados, duplicados, contradicciones y correcciones de email o vínculo con revalidación completa; verificar que cancelar no escriba datos y que ninguna fila pendiente pueda confirmarse.
+- [x] 5.7 Implementar en Next.js la confirmación transaccional que haga `upsert` de `registrations` y su proyección en `candidates` o `mentor_profiles`, sin crear equipos ni eliminar personas omitidas; verificar altas, actualizaciones, docentes, resumen y auditoría.
+- [x] 5.8 Adaptar la administración del padrón para consultar y corregir inscripciones privadas, perfiles de mentor, candidatos y FTCA; verificar unicidad, permisos, auditoría y recálculo del equipo afectado.
+- [x] 5.9 Probar que las búsquedas y vistas de candidatos expongan solamente nombre completo, email y estado operativo permitido, mientras DNI, teléfono, datos académicos y consentimientos permanezcan restringidos a administradores.
+- [x] 5.10 Crear fixtures anonimizados con la estructura de las veinte columnas del archivo real y actualizar las pruebas mixtas CSV/Excel; verificar ramas vacías válidas, duplicados, email inválido, tres contradicciones, docentes y padrón final.
 
 ## 6. Experiencia de formación de equipos
 

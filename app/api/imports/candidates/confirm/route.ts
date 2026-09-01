@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { confirmCandidateImport } from "@/lib/import/confirm-candidates";
+import { confirmRegistrationImport } from "@/lib/import/confirm-registrations";
+import {
+  buildRegistrationPreview,
+  registrationImportRowSchema,
+} from "@/lib/import/registrations";
 import {
   createPocketBaseServiceClient,
   requirePocketBaseAdmin,
@@ -9,22 +13,15 @@ import { ApiError, errorResponse } from "@/lib/server/api-error";
 
 export const runtime = "nodejs";
 
-const rowSchema = z.object({
-  firstName: z.string().trim().min(1).max(120),
-  lastName: z.string().trim().min(1).max(120),
-  email: z.email().max(254),
-  emailNormalized: z.email().max(254),
-  ftcaStatus: z.enum(["confirmed", "not_ftca", "pending"]),
-});
-
 const requestSchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   fileType: z.enum(["csv", "xlsx"]),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
   reason: z.string().max(1000).default(""),
-  rows: z.array(rowSchema),
+  rows: z.array(registrationImportRowSchema),
   invalidRows: z.number().int().min(0),
-  pendingFtcaRows: z.number().int().min(0),
+  reviewRows: z.number().int().min(0),
+  ignoredDuplicateRows: z.number().int().min(0),
 });
 
 export async function POST(request: Request) {
@@ -43,8 +40,36 @@ export async function POST(request: Request) {
     if (parsed.data.rows.length === 0) {
       return errorResponse(new ApiError(400, "No hay filas válidas para importar.", "empty_import"));
     }
+    const verified = buildRegistrationPreview(parsed.data.rows);
+    if (
+      verified.summary.invalid > 0 ||
+      verified.summary.review > 0 ||
+      verified.summary.ignoredDuplicates > 0 ||
+      verified.valid.length !== parsed.data.rows.length
+    ) {
+      return errorResponse(
+        new ApiError(
+          400,
+          "Las filas cambiaron o requieren una nueva validación.",
+          "stale_import_preview",
+        ),
+      );
+    }
+    if (parsed.data.reviewRows > 0) {
+      return errorResponse(
+        new ApiError(
+          400,
+          "La vista previa contiene filas pendientes de revisión.",
+          "import_requires_review",
+        ),
+      );
+    }
+
     const pb = await createPocketBaseServiceClient();
-    const result = await confirmCandidateImport(pb, user, parsed.data);
+    const result = await confirmRegistrationImport(pb, user, {
+      ...parsed.data,
+      rows: verified.valid,
+    });
     return Response.json(result, { status: 201 });
   } catch (error) {
     return errorResponse(error);

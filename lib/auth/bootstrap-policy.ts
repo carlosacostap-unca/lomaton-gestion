@@ -1,7 +1,8 @@
 export type BootstrapCandidate = {
   id: string;
-  firstName: string;
-  lastName: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   active: boolean;
 };
 
@@ -33,7 +34,7 @@ export function evaluateBootstrapAccess(input: {
   }
 
   const candidateName = candidate
-    ? `${candidate.firstName} ${candidate.lastName}`.trim()
+    ? candidate.fullName?.trim() || `${candidate.firstName ?? ""} ${candidate.lastName ?? ""}`.trim()
     : "";
   return {
     allowed: true as const,
