@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
 
 const pocketBaseUrl = process.env.PB_E2E_BASE_URL;
+const appUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const superuserIdentity = process.env.PB_E2E_SUPERUSER_IDENTITY;
 const superuserPassword = process.env.PB_E2E_SUPERUSER_PASSWORD;
 
@@ -23,25 +24,49 @@ async function seed() {
   const adminToken = String((await json(await fetch(`${pocketBaseUrl}/__local-test/token/${admin.id}`, { method: "POST", headers: { Authorization: superToken } }))).token);
   const suffix = Date.now().toString(36);
   const rows = [
-    { firstName: "Alma", lastName: `E2E ${suffix}`, email: `alma-${suffix}@test.invalid`, ftcaStatus: "confirmed" },
-    { firstName: "Bruno", lastName: `E2E ${suffix}`, email: `bruno-${suffix}@test.invalid`, ftcaStatus: "not_ftca" },
-    { firstName: "Clara", lastName: `E2E ${suffix}`, email: `clara-${suffix}@test.invalid`, ftcaStatus: "pending" },
-  ].map((row, index) => ({ ...row, rowNumber: index + 2, emailNormalized: row.email }));
-  await json(await fetch(`${pocketBaseUrl}/api/lomaton/admin/import-candidates`, {
-    method: "POST", headers: { Authorization: adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ fileName: "e2e.csv", fileType: "csv", digest: suffix.padEnd(64, "0").slice(0, 64), reason: "preparar E2E", invalidRows: 0, pendingFtcaRows: 1, rows }),
+    { fullName: `Alma E2E ${suffix}`, email: `alma-${suffix}@test.invalid`, relationship: "student_ftca", relationshipSource: "Estudiante FTYCA", ftcaStatus: "confirmed", career: "Ingeniería en Informática" },
+    { fullName: `Bruno E2E ${suffix}`, email: `bruno-${suffix}@test.invalid`, relationship: "student_external", relationshipSource: "Estudiante externo", ftcaStatus: "not_ftca", career: "Abogacía" },
+    { fullName: `Clara E2E ${suffix}`, email: `clara-${suffix}@test.invalid`, relationship: "student_external", relationshipSource: "Estudiante externo", ftcaStatus: "not_ftca", career: "Licenciatura en Historia" },
+  ].map((row, index) => {
+    const dni = String(90_000_000 + (Date.now() % 1_000_000) + index);
+    const phone = `383499${String(index).padStart(4, "0")}`;
+    return {
+      ...row,
+      rowNumber: index + 2,
+      submittedAt: new Date().toISOString(),
+      dni,
+      dniNormalized: dni,
+      phone,
+      phoneNormalized: phone,
+      emailNormalized: row.email,
+      department: "",
+      academicUnit: row.relationship === "student_ftca" ? "FTCA" : "UNCA",
+      ftcaCareer: row.relationship === "student_ftca" ? row.career : "",
+      externalCareer: row.relationship === "student_external" ? row.career : "",
+      externalTeacherDescription: "",
+      mentorInterest: null,
+      declaredTeamStatus: "none",
+      declaredTeamMembers: "",
+      termsAccepted: true,
+      mediaAuthorized: true,
+      rawSource: {},
+    };
+  });
+  await json(await fetch(`${appUrl}/api/imports/candidates/confirm`, {
+    method: "POST", headers: { Authorization: adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ fileName: "e2e.csv", fileType: "csv", digest: Date.now().toString(16).padEnd(64, "0").slice(0, 64), reason: "preparar E2E", invalidRows: 0, reviewRows: 0, ignoredDuplicateRows: 0, rows }),
   }));
   const candidates = await json(await fetch(`${pocketBaseUrl}/api/collections/candidates/records?perPage=500`, { headers: { Authorization: adminToken } }));
   const seeded: SeededUser[] = [];
   for (const row of rows) {
     const candidate = candidates.items.find((item: Record<string, unknown>) => item.emailNormalized === row.email);
     const user = await json(await fetch(`${pocketBaseUrl}/__local-test/users`, {
-      method: "POST", headers: { Authorization: superToken, "Content-Type": "application/json" }, body: JSON.stringify({ email: row.email, candidateId: candidate.id, displayName: row.firstName, isAdmin: false }),
+      method: "POST", headers: { Authorization: superToken, "Content-Type": "application/json" }, body: JSON.stringify({ email: row.email, candidateId: candidate.id, displayName: row.fullName, isAdmin: false }),
     }));
     const token = await json(await fetch(`${pocketBaseUrl}/__local-test/token/${user.id}`, { method: "POST", headers: { Authorization: superToken } }));
     const record = await json(await fetch(`${pocketBaseUrl}/api/collections/users/records/${user.id}`, { headers: { Authorization: superToken } }));
     seeded.push({ id: String(user.id), candidateId: String(candidate.id), email: row.email, token: String(token.token), record });
   }
-  await json(await fetch(`${pocketBaseUrl}/api/lomaton/admin/settings`, {
+  await json(await fetch(`${appUrl}/api/lomaton/admin/settings`, {
     method: "PATCH", headers: { Authorization: adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ deadlineUtc: "2030-12-31T23:59:00.000Z", formationOpen: true, reason: "habilitar E2E" }),
   }));
   return { users: seeded, teamName: `Equipo E2E ${suffix}`, adminAuth: { token: adminToken, record: admin as Record<string, unknown> } };
@@ -83,7 +108,7 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await expect(owner.getByText(teamName)).toBeVisible();
   await expect(owner.getByText("complete")).toBeVisible();
   await expect(owner.getByText("3/4 integrantes")).toBeVisible();
-  const duplicate = await request.post(`${pocketBaseUrl}/api/lomaton/teams`, {
+  const duplicate = await request.post(`${appUrl}/api/lomaton/teams`, {
     headers: { Authorization: users[1].token }, data: { name: `Segundo ${teamName}` },
   });
   expect(duplicate.status()).toBe(409);
@@ -99,8 +124,8 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   expect(await adminPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await adminContext.close();
 
-  const snapshot = await json(await fetch(`${pocketBaseUrl}/api/lomaton/admin/report-snapshot`, { headers: { Authorization: adminAuth.token } }));
+  const snapshot = await json(await fetch(`${appUrl}/api/lomaton/admin/report-snapshot`, { headers: { Authorization: adminAuth.token } }));
   const team = snapshot.teams.find((item: Record<string, unknown>) => item.name === teamName);
-  if (team) await json(await fetch(`${pocketBaseUrl}/api/lomaton/admin/teams/${team.id}`, { method: "DELETE", headers: { Authorization: adminAuth.token, "Content-Type": "application/json" }, body: JSON.stringify({ reason: "limpieza E2E" }) }));
+  if (team) await json(await fetch(`${appUrl}/api/lomaton/admin/teams/${team.id}`, { method: "DELETE", headers: { Authorization: adminAuth.token, "Content-Type": "application/json" }, body: JSON.stringify({ reason: "limpieza E2E" }) }));
   await ownerContext.close();
 });

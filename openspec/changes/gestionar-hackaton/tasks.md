@@ -19,12 +19,12 @@
 
 ## 3. Comandos de dominio para equipos
 
-- [ ] 3.1 Implementar Route Handlers de Next.js para crear y disolver equipos y enviar o retirar invitaciones mediante la API Batch; verificar autorización, plazo, unicidad y disponibilidad.
-- [ ] 3.2 Implementar Route Handlers para aceptar y rechazar invitaciones en un lote transaccional; verificar que aceptar cree una sola membresía y cancele las restantes invitaciones pendientes.
-- [ ] 3.3 Implementar restricciones transaccionales de un equipo por candidato y máximo cuatro miembros mediante índices y actualización condicional de contadores; verificar carreras concurrentes.
+- [x] 3.1 Implementar Route Handlers de Next.js para crear y disolver equipos y enviar o retirar invitaciones mediante la API Batch; verificar autorización, plazo, unicidad y disponibilidad.
+- [x] 3.2 Implementar Route Handlers para aceptar y rechazar invitaciones en un lote transaccional; verificar que aceptar cree una sola membresía y cancele las restantes invitaciones pendientes.
+- [x] 3.3 Implementar restricciones transaccionales de un equipo por candidato y máximo cuatro miembros mediante índices y actualización condicional de contadores; verificar carreras concurrentes.
 - [x] 3.4 Implementar el recálculo de `draft`, `missing_ftca`, `complete` e `invalid` dentro de los lotes que cambian membresía o FTCA; verificar todos los escenarios.
-- [ ] 3.5 Implementar Route Handlers administrativos para crear, renombrar, reorganizar y disolver equipos y resolver invitaciones; verificar restricciones y motivo posterior al cierre.
-- [ ] 3.6 Implementar una ruta de reconciliación de estados mediante lotes acotados; verificar que detecte y corrija una proyección preparada como inconsistente.
+- [x] 3.5 Implementar Route Handlers administrativos para crear, renombrar, reorganizar y disolver equipos y resolver invitaciones; verificar restricciones y motivo posterior al cierre.
+- [x] 3.6 Implementar una ruta de reconciliación de estados mediante lotes acotados; verificar que detecte y corrija una proyección preparada como inconsistente.
 
 ## 4. Acceso con Google y sesión web
 
@@ -50,19 +50,19 @@
 ## 6. Experiencia de formación de equipos
 
 - [x] 6.1 Crear el panel del candidato con estado personal, equipo actual, invitaciones recibidas y plazo argentino; verificar sus variantes sin equipo, con invitaciones y con equipo.
-- [ ] 6.2 Conectar la creación de equipo con el Route Handler local y la incorporación transaccional del responsable; verificar duplicado, candidato ocupado y cierre vencido.
-- [ ] 6.3 Conectar búsqueda, envío y retiro de invitaciones con los Route Handlers locales; verificar privacidad y duplicados.
-- [ ] 6.4 Conectar aceptación y rechazo con los nuevos comandos Batch; verificar éxito, cupo agotado y membresía concurrente.
-- [ ] 6.5 Verificar que la interfaz refleje las proyecciones recalculadas por Next.js sin contar invitaciones como miembros, para uno a cuatro integrantes y los tres estados FTCA.
-- [ ] 6.6 Conectar la disolución voluntaria con el Route Handler local y conservar el bloqueo de expulsión unilateral; verificar liberación de miembros.
+- [x] 6.2 Conectar la creación de equipo con el Route Handler local y la incorporación transaccional del responsable; verificar duplicado, candidato ocupado y cierre vencido.
+- [x] 6.3 Conectar búsqueda, envío y retiro de invitaciones con los Route Handlers locales; verificar privacidad y duplicados.
+- [x] 6.4 Conectar aceptación y rechazo con los nuevos comandos Batch; verificar éxito, cupo agotado y membresía concurrente.
+- [x] 6.5 Verificar que la interfaz refleje las proyecciones recalculadas por Next.js sin contar invitaciones como miembros, para uno a cuatro integrantes y los tres estados FTCA.
+- [x] 6.6 Conectar la disolución voluntaria con el Route Handler local y conservar el bloqueo de expulsión unilateral; verificar liberación de miembros.
 - [ ] 6.7 Actualizar las pruebas E2E del flujo completo para la frontera Next.js/PocketBase revisada; verificar rechazo de una segunda membresía.
 
 ## 7. Administración del hackatón
 
-- [ ] 7.1 Trasladar la configuración del plazo y cierre manual al Route Handler de Next.js; verificar conversión UTC, vencimiento, reapertura y auditoría.
-- [ ] 7.2 Aplicar el bloqueo por hora del servidor en todos los Route Handlers de mutación de candidatos; verificar que ninguna ruta alternativa evite el cierre.
-- [ ] 7.3 Conectar la interfaz administrativa con los Route Handlers locales para equipos e invitaciones; verificar intervenciones normales y posteriores al cierre con motivo.
-- [ ] 7.4 Verificar alertas y filtros contra los estados recalculados por los nuevos comandos; comprobar que un cambio FTCA se refleje de forma consistente.
+- [x] 7.1 Trasladar la configuración del plazo y cierre manual al Route Handler de Next.js; verificar conversión UTC, vencimiento, reapertura y auditoría.
+- [x] 7.2 Aplicar el bloqueo por hora del servidor en todos los Route Handlers de mutación de candidatos; verificar que ninguna ruta alternativa evite el cierre.
+- [x] 7.3 Conectar la interfaz administrativa con los Route Handlers locales para equipos e invitaciones; verificar intervenciones normales y posteriores al cierre con motivo.
+- [x] 7.4 Verificar alertas y filtros contra los estados recalculados por los nuevos comandos; comprobar que un cambio FTCA se refleje de forma consistente.
 - [x] 7.5 Crear la vista de auditoría por entidad y actor; verificar orden cronológico, instantáneas anterior/posterior e inmutabilidad desde la interfaz.
 
 ## 8. Reportes y exportaciones

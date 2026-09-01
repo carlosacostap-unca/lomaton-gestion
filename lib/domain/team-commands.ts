@@ -59,6 +59,24 @@ async function membershipByCandidate(pb: PocketBase, candidateId: string) {
   }
 }
 
+async function pendingInvitation(
+  pb: PocketBase,
+  teamId: string,
+  candidateId: string,
+) {
+  try {
+    return await pb.collection("team_invitations").getFirstListItem(
+      pb.filter(
+        "team = {:team} && candidate = {:candidate} && status = 'pending'",
+        { team: teamId, candidate: candidateId },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 async function teamMemberships(pb: PocketBase, teamId: string) {
   return pb.collection("team_memberships").getFullList({
     filter: pb.filter("team = {:team}", { team: teamId }),
@@ -175,6 +193,13 @@ export async function inviteCandidate(
   if (await membershipByCandidate(pb, candidateId)) {
     throw new ApiError(409, "El candidato ya pertenece a un equipo.", "candidate_already_member");
   }
+  if (await pendingInvitation(pb, teamId, candidateId)) {
+    throw new ApiError(
+      409,
+      "El candidato ya tiene una invitación pendiente para este equipo.",
+      "invitation_already_pending",
+    );
+  }
   if (Number(team.memberCount) >= 4) {
     throw new ApiError(409, "El equipo ya alcanzó cuatro integrantes.", "team_full");
   }
@@ -254,6 +279,12 @@ export async function resolveOwnInvitation(
   ]);
   const expectedMemberCount = Number(team.memberCount);
   if (expectedMemberCount >= 4) {
+    batch.collection("team_invitations").update(invitation.id, {
+      status: "cancelled",
+      resolvedAt: now(),
+    });
+    updateVersion(batch, currentSettings.id);
+    await sendBatch(batch);
     throw new ApiError(409, "El equipo alcanzó cuatro integrantes.", "team_full");
   }
   const projection = await projectionFor(pb, memberships, candidateId);
