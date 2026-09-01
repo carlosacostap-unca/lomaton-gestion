@@ -29,9 +29,9 @@
 ## 4. Acceso con Google y sesión web
 
 - [x] 4.1 Crear el cliente PocketBase para navegador sin compartir estado de autenticación entre solicitudes de servidor; verificar aislamiento mediante pruebas de dos sesiones independientes.
-- [ ] 4.2 Implementar la pantalla de inicio con Google y el flujo OAuth2 de PocketBase; verificar login, cancelación, error del proveedor y cierre de sesión.
+- [x] 4.2 Implementar la pantalla de inicio con Google y el flujo OAuth2 de PocketBase; verificar login, cancelación, error del proveedor y cierre de sesión.
 - [x] 4.3 Incorporar la ayuda para usar un correo no Gmail con una cuenta Google y el enlace oficial; verificar que sea accesible antes de iniciar sesión.
-- [ ] 4.4 Integrar el bootstrap posterior a OAuth, refrescar identidad y permisos de candidato/administrador y proteger las áreas correspondientes; verificar que cada rol vea solamente rutas y acciones autorizadas.
+- [x] 4.4 Integrar el bootstrap posterior a OAuth, refrescar identidad y permisos de candidato/administrador y proteger las áreas correspondientes; verificar que cada rol vea solamente rutas y acciones autorizadas.
 - [x] 4.5 Configurar una política CSP y medidas contra XSS acordes al almacenamiento del token en el navegador; verificar encabezados y ejecutar pruebas con contenido importado no confiable.
 
 ## 5. Padrón e importaciones
@@ -79,4 +79,4 @@
 - [x] 9.2 Reejecutar pruebas de seguridad sobre la nueva frontera Next.js/PocketBase, cuenta técnica, control de acceso, IDs, archivos, XSS y carreras; verificar ausencia de cambios persistentes en casos negativos.
 - [x] 9.3 Ejecutar la suite completa, `npm run lint` y `npm run build` después del traslado; verificar que finalicen sin errores ni advertencias nuevas sin justificar.
 - [x] 9.4 Documentar Google OAuth2, variables de Next.js, cuenta técnica, cambios PocketBase por MCP, API Batch, backup, rollback y despliegue separado en Dokploy; verificar el procedimiento usando solamente local y producción.
-- [ ] 9.5 Realizar una prueba de aceptación con padrón de muestra que cubra importación, login, equipo válido, intervención posterior al cierre y exportación; verificar cada escenario contra las especificaciones OpenSpec.
+- [x] 9.5 Realizar una prueba de aceptación con padrón de muestra que cubra importación, login, equipo válido, intervención posterior al cierre y exportación; verificar cada escenario contra las especificaciones OpenSpec.
