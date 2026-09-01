@@ -10,10 +10,10 @@
 
 - [x] 2.1 Mantener una definición versionada del esquema esperado, incluyendo `service_accounts` y `dataVersion`, y un procedimiento idempotente para aplicarlo mediante MCP; verificar el esquema resultante en producción sin ejecutar migraciones durante un push.
 - [x] 2.2 Agregar índices únicos para email y nombre normalizados, membresía única por candidato e invitaciones pendientes relevantes; verificar con pruebas que PocketBase rechace duplicados y carreras incompatibles.
-- [ ] 2.3 Configurar API Rules de mínimo privilegio para que las escrituras gobernadas acepten solamente la cuenta técnica y la `authRule` de `users` autorice emails presentes en padrón o allowlist; verificar tokens anónimo, candidato, administrador, técnico y superusuario.
+- [x] 2.3 Configurar API Rules de mínimo privilegio para que las escrituras gobernadas acepten solamente la cuenta técnica y la `authRule` de `users` autorice emails presentes en padrón o allowlist; verificar tokens anónimo, candidato, administrador, técnico y superusuario.
 - [x] 2.4 Reemplazar los hooks de Google OAuth por la regla de autorización y el Route Handler `/api/lomaton/auth/bootstrap`; verificar accesos de candidato, administrador, identidad mixta y email no autorizado.
 - [x] 2.5 Implementar una forma segura y reproducible de cargar los emails administradores iniciales; verificar que no se requieran credenciales `_superusers` en tiempo de ejecución.
-- [ ] 2.6 Implementar el registro inmutable de auditoría desde Route Handlers mediante la cuenta técnica; verificar que pueda crear registros pero que ningún usuario o cuenta técnica pueda editarlos ni eliminarlos.
+- [x] 2.6 Implementar el registro inmutable de auditoría desde Route Handlers mediante la cuenta técnica; verificar que pueda crear registros pero que ningún usuario o cuenta técnica pueda editarlos ni eliminarlos.
 - [x] 2.7 Validar de forma no destructiva los cambios MCP contra el esquema de producción respaldado y documentar rollback por despliegue anterior o restauración evaluada del backup, sin depender de staging ni de migraciones `down`.
 - [x] 2.8 Extender mediante MCP el esquema esperado con `registrations`, `mentor_profiles` y la relación privada hacia `candidates`, incluyendo índices de identidad y reglas de mínimo privilegio; verificar que candidatos anónimos o autenticados no puedan leer DNI, teléfono, consentimientos ni respuestas académicas.
 
@@ -55,7 +55,7 @@
 - [x] 6.4 Conectar aceptación y rechazo con los nuevos comandos Batch; verificar éxito, cupo agotado y membresía concurrente.
 - [x] 6.5 Verificar que la interfaz refleje las proyecciones recalculadas por Next.js sin contar invitaciones como miembros, para uno a cuatro integrantes y los tres estados FTCA.
 - [x] 6.6 Conectar la disolución voluntaria con el Route Handler local y conservar el bloqueo de expulsión unilateral; verificar liberación de miembros.
-- [ ] 6.7 Actualizar las pruebas E2E del flujo completo para la frontera Next.js/PocketBase revisada; verificar rechazo de una segunda membresía.
+- [x] 6.7 Actualizar las pruebas E2E del flujo completo para la frontera Next.js/PocketBase revisada; verificar rechazo de una segunda membresía.
 
 ## 7. Administración del hackatón
 
@@ -76,7 +76,7 @@
 ## 9. Verificación y despliegue
 
 - [x] 9.1 Revisar accesibilidad y diseño adaptable de login, candidato y administración; verificar navegación por teclado, etiquetas, estados de foco y tamaños móviles/escritorio.
-- [ ] 9.2 Reejecutar pruebas de seguridad sobre la nueva frontera Next.js/PocketBase, cuenta técnica, control de acceso, IDs, archivos, XSS y carreras; verificar ausencia de cambios persistentes en casos negativos.
+- [x] 9.2 Reejecutar pruebas de seguridad sobre la nueva frontera Next.js/PocketBase, cuenta técnica, control de acceso, IDs, archivos, XSS y carreras; verificar ausencia de cambios persistentes en casos negativos.
 - [x] 9.3 Ejecutar la suite completa, `npm run lint` y `npm run build` después del traslado; verificar que finalicen sin errores ni advertencias nuevas sin justificar.
 - [x] 9.4 Documentar Google OAuth2, variables de Next.js, cuenta técnica, cambios PocketBase por MCP, API Batch, backup, rollback y despliegue separado en Dokploy; verificar el procedimiento usando solamente local y producción.
 - [ ] 9.5 Realizar una prueba de aceptación con padrón de muestra que cubra importación, login, equipo válido, intervención posterior al cierre y exportación; verificar cada escenario contra las especificaciones OpenSpec.
