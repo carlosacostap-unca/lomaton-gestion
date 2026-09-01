@@ -11,16 +11,20 @@ export class BrowserApiError extends Error {
   }
 }
 
+export function getBrowserAuthorizationHeader(): string {
+  const token = getBrowserPocketBase().authStore.token;
+  if (!token) throw new BrowserApiError("La sesión venció.", 401);
+  return "Bearer " + token;
+}
+
 export async function callLomatonApi<T = unknown>(
   path: string,
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const pb = getBrowserPocketBase();
-  if (!pb.authStore.token) throw new BrowserApiError("La sesión venció.", 401);
   const response = await fetch(path, {
     method: options.method ?? "GET",
     headers: {
-      Authorization: `Bearer ${pb.authStore.token}`,
+      Authorization: getBrowserAuthorizationHeader(),
       ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),

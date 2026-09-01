@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { useAuth } from "@/app/components/auth-provider";
-import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import { getBrowserAuthorizationHeader } from "@/lib/pocketbase/browser-api";
 import { CandidateAdminList } from "./candidate-admin-list";
 import { AdminOverview } from "./admin-overview";
 import { HackathonSettings } from "./hackathon-settings";
@@ -45,7 +45,7 @@ export default function AdminPage() {
     try {
       const response = await fetch("/api/imports/candidates/preview", {
         method: "POST",
-        headers: { Authorization: getBrowserPocketBase().authStore.token },
+        headers: { Authorization: getBrowserAuthorizationHeader() },
         body: formData,
       });
       const data = await response.json();
@@ -66,7 +66,7 @@ export default function AdminPage() {
       const response = await fetch("/api/imports/candidates/confirm", {
         method: "POST",
         headers: {
-          Authorization: getBrowserPocketBase().authStore.token,
+          Authorization: getBrowserAuthorizationHeader(),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -95,7 +95,7 @@ export default function AdminPage() {
     setMessage("");
     try {
       const response = await fetch(`/api/exports/${kind}/${format}`, {
-        headers: { Authorization: getBrowserPocketBase().authStore.token },
+        headers: { Authorization: getBrowserAuthorizationHeader() },
       });
       if (!response.ok) throw new Error("No se pudo generar la exportación.");
       const blob = await response.blob();
