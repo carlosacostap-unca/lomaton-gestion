@@ -29,7 +29,7 @@ async function count(pb: PocketBase, collection: string) {
 const enabled = process.env.LOMATON_PARTICIPANT_PORTAL_ACCEPTANCE === "true";
 
 describe.runIf(enabled)("participant portal production acceptance", () => {
-  it("covers role bootstrap, self-service, competing teams, mentor exclusivity, admin assistance, reports and cleanup", async () => {
+  it("covers role bootstrap, self-service, admin mentor assignment, unlimited teacher capacity, reports and cleanup", async () => {
     const env = loadLocalEnv();
     const url = env.POCKETBASE_URL || env.NEXT_PUBLIC_POCKETBASE_URL;
     const identity = env.POCKETBASE_SUPERUSER_EMAIL || env.POCKETBASE_ADMIN_EMAIL;
@@ -38,6 +38,9 @@ describe.runIf(enabled)("participant portal production acceptance", () => {
     const servicePassword = env.POCKETBASE_SERVICE_PASSWORD;
     expect(url).toBe("https://pb-lomaton.epixum.com");
     expect(identity && password && serviceEmail && servicePassword).toBeTruthy();
+    process.env.POCKETBASE_URL = url;
+    process.env.POCKETBASE_SERVICE_EMAIL = serviceEmail;
+    process.env.POCKETBASE_SERVICE_PASSWORD = servicePassword;
 
     const superuser = new PocketBase(url);
     const service = new PocketBase(url);
@@ -47,7 +50,7 @@ describe.runIf(enabled)("participant portal production acceptance", () => {
     await service.collection("service_accounts").authWithPassword(serviceEmail, servicePassword);
 
     const { createTeam, disbandOwnTeam } = await import("@/lib/domain/team-commands");
-    const { getOwnMentorDashboard, getTeamMentorState, inviteMentor, listEligibleMentors, removeAdminMentorship, resolveAdminMentorInvitation, resolveMentorInvitation } = await import("@/lib/domain/mentor-commands");
+    const { assignAdminMentor, getOwnMentorDashboard, getTeamMentorState, removeAdminMentorship } = await import("@/lib/domain/mentor-commands");
     const { updateOwnProfile } = await import("@/lib/domain/participant-profile");
     const { readConsistentReportSnapshot } = await import("@/lib/report/snapshot");
     const bootstrapRoute = await import("@/app/api/lomaton/auth/bootstrap/route");
@@ -120,17 +123,12 @@ describe.runIf(enabled)("participant portal production acceptance", () => {
 
       const team1 = await createTeam(service, student1 as never, `E2E Norte ${suffix}`); versionIncrements += 1; ids.team1 = team1.id;
       const team2 = await createTeam(service, student2 as never, `E2E Sur ${suffix}`); versionIncrements += 1; ids.team2 = team2.id;
-      const available = await listEligibleMentors(service, student1 as never, team1.id);
-      expect(available).toEqual(expect.arrayContaining([expect.objectContaining({ id: ids.mentor1, fullName: "E2E Docente Uno" })]));
-      expect(JSON.stringify(available)).not.toContain(emails.teacher1);
-
-      const invite1 = await inviteMentor(service, student1 as never, team1.id, ids.mentor1); versionIncrements += 1; ids.invite1 = invite1.id;
-      const invite2 = await inviteMentor(service, student2 as never, team2.id, ids.mentor1); versionIncrements += 1; ids.invite2 = invite2.id;
-      const accepted = await resolveMentorInvitation(service, teacher as never, invite1.id, "accepted"); versionIncrements += 1;
-      expect(accepted.assignment).toMatchObject({ id: team1.id, name: expect.stringContaining("E2E Norte") });
-      await expect(resolveMentorInvitation(service, teacher as never, invite2.id, "accepted")).rejects.toMatchObject({ status: 409, code: "invitation_resolved" });
-
-      await expect(service.collection("team_mentorships").create({ team: team2.id, mentor: ids.mentor1, source: "admin" })).rejects.toMatchObject({ status: 400 });
+      const adminUserCurrent = await superuser.collection("users").getOne(ids.adminUser);
+      const assignment1 = await assignAdminMentor(service, adminUserCurrent as never, team1.id, ids.mentor1, "Aceptación E2E: asignar primer equipo"); versionIncrements += 1;
+      const assignment2 = await assignAdminMentor(service, adminUserCurrent as never, team2.id, ids.mentor1, "Aceptación E2E: compartir docente"); versionIncrements += 1;
+      expect(assignment1).toMatchObject({ team: team1.id, mentor: ids.mentor1, source: "admin" });
+      expect(assignment2).toMatchObject({ team: team2.id, mentor: ids.mentor1, source: "admin" });
+      expect(await service.collection("team_mentorships").getFullList({ filter: service.filter("mentor = {:mentor}", { mentor: ids.mentor1 }) })).toHaveLength(2);
       await expect(service.collection("team_mentorships").create({ team: team1.id, mentor: ids.mentor2, source: "admin" })).rejects.toMatchObject({ status: 400 });
 
       const beforeProfile = await service.collection("registrations").getOne(ids.teacherRegistration1);
@@ -140,29 +138,32 @@ describe.runIf(enabled)("participant portal production acceptance", () => {
 
       const studentView = await getTeamMentorState(service, student1 as never, team1.id);
       expect(studentView.assignment?.mentor).toMatchObject({ fullName: "E2E Docente Uno", department: "FACEN E2E" });
+      expect(studentView).not.toHaveProperty("invitations");
       const teacherView = await getOwnMentorDashboard(service, teacher as never);
-      expect(teacherView.assignment?.members).toEqual([{ id: ids.candidate1, fullName: "E2E Estudiante Uno" }]);
+      expect(teacherView.assignments).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: team1.id, members: [{ id: ids.candidate1, fullName: "E2E Estudiante Uno" }] }),
+        expect.objectContaining({ id: team2.id, members: [{ id: ids.candidate2, fullName: "E2E Estudiante Dos" }] }),
+      ]));
       expect(JSON.stringify(teacherView)).not.toContain("certificate");
       expect(JSON.stringify(teacherView)).not.toContain("dni");
+      expect(JSON.stringify(teacherView)).not.toContain(emails.student1);
 
       const snapshot = await readConsistentReportSnapshot(service);
       const snapshotTeam = snapshot.teams.find((item) => item.id === team1.id);
       expect(snapshotTeam).toMatchObject({ memberCount: 1, ftcaConfirmedCount: 1 });
-      expect(snapshot.mentorships).toEqual(expect.arrayContaining([expect.objectContaining({ team: team1.id, mentor: ids.mentor1 })]));
+      expect(snapshot.mentorships).toEqual(expect.arrayContaining([
+        expect.objectContaining({ team: team1.id, mentor: ids.mentor1 }),
+        expect.objectContaining({ team: team2.id, mentor: ids.mentor1 }),
+      ]));
+
+      const replacement = await assignAdminMentor(service, adminUserCurrent as never, team1.id, ids.mentor2, "Aceptación E2E: reemplazar docente"); versionIncrements += 1;
+      expect(replacement).toMatchObject({ id: assignment1.id, team: team1.id, mentor: ids.mentor2 });
+      expect(await service.collection("team_mentorships").getFullList({ filter: service.filter("mentor = {:mentor}", { mentor: ids.mentor1 }) })).toHaveLength(1);
 
       await disbandOwnTeam(service, student1 as never, team1.id); versionIncrements += 1;
       delete ids.team1;
-      expect(await service.collection("team_mentorships").getFullList({ filter: service.filter("mentor = {:mentor}", { mentor: ids.mentor1 }) })).toEqual([]);
-      expect(await listEligibleMentors(service, student2 as never, team2.id)).toEqual(expect.arrayContaining([expect.objectContaining({ id: ids.mentor1 })]));
-
-      const adminUserCurrent = await superuser.collection("users").getOne(ids.adminUser);
-      const adminCancelled = await inviteMentor(service, student2 as never, team2.id, ids.mentor1); versionIncrements += 1;
-      await resolveAdminMentorInvitation(service, adminUserCurrent as never, adminCancelled.id, "Aceptación E2E: cancelar invitación"); versionIncrements += 1;
-      const finalInvite = await inviteMentor(service, student2 as never, team2.id, ids.mentor1); versionIncrements += 1;
-      const finalAccepted = await resolveMentorInvitation(service, teacher as never, finalInvite.id, "accepted"); versionIncrements += 1;
-      const mentorship = await service.collection("team_mentorships").getFirstListItem(service.filter("team = {:team}", { team: team2.id }));
-      expect(finalAccepted.assignment?.id).toBe(team2.id);
-      await removeAdminMentorship(service, adminUserCurrent as never, mentorship.id, "Aceptación E2E: liberar docente"); versionIncrements += 1;
+      expect(await service.collection("team_mentorships").getFullList({ filter: service.filter("mentor = {:mentor}", { mentor: ids.mentor2 }) })).toEqual([]);
+      await removeAdminMentorship(service, adminUserCurrent as never, assignment2.id, "Aceptación E2E: retirar mentoría"); versionIncrements += 1;
       expect(await service.collection("team_mentorships").getFullList({ filter: service.filter("mentor = {:mentor}", { mentor: ids.mentor1 }) })).toEqual([]);
 
       const anonymousRegistrations = await fetch(`${url}/api/collections/registrations/records?page=1&perPage=1`);

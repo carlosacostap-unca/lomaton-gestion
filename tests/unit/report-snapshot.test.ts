@@ -10,10 +10,14 @@ beforeAll(async () => {
   ({ readConsistentReportSnapshot } = await import("@/lib/report/snapshot"));
 });
 
-function fakePocketBase(beforeVersions: number[], afterVersions: number[]) {
+function fakePocketBase(
+  beforeVersions: number[],
+  afterVersions: number[],
+  records: Record<string, Array<Record<string, unknown> & { id: string }>> = {},
+) {
   let beforeIndex = 0;
   let afterIndex = 0;
-  const list = vi.fn(async () => []);
+  const list = vi.fn(async (name: string) => records[name] ?? []);
   const settings = {
     getFirstListItem: vi.fn(async () => ({
       id: "default-settings",
@@ -27,7 +31,7 @@ function fakePocketBase(beforeVersions: number[], afterVersions: number[]) {
   const pb = {
     filter: vi.fn(() => "key='default'"),
     collection: vi.fn((name: string) =>
-      name === "hackathon_settings" ? settings : { getFullList: list },
+      name === "hackathon_settings" ? settings : { getFullList: () => list(name) },
     ),
   } as unknown as PocketBase;
   return { pb, list };
@@ -47,5 +51,19 @@ describe("consistent report snapshot", () => {
       status: 409,
       code: "snapshot_changed",
     });
+  });
+
+  it("preserves cancelled and resolved mentor invitations only as report history", async () => {
+    const historical = [
+      { id: "invite1", team: "team1", mentor: "mentor1", status: "accepted" },
+      { id: "invite2", team: "team1", mentor: "mentor1", status: "cancelled" },
+    ];
+    const { pb } = fakePocketBase([4], [4], {
+      mentor_invitations: historical,
+      team_mentorships: [{ id: "assignment1", team: "team1", mentor: "mentor1" }],
+    });
+    const snapshot = await readConsistentReportSnapshot(pb);
+    expect(snapshot.mentorInvitations).toEqual(historical);
+    expect(snapshot.mentorships).toEqual([{ id: "assignment1", team: "team1", mentor: "mentor1" }]);
   });
 });

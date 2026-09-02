@@ -50,58 +50,46 @@ describe("participant portal components", () => {
     expect((screen.getByRole("button", { name: "Guardar cambios" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("shows safe teacher invitations and never renders certificate controls", async () => {
-    api.mockResolvedValueOnce({ assignment: null, invitations: [{ id: "invite1", status: "pending", team: { id: "team1", name: "Equipo Norte" } }] });
+  it("shows every assigned team to the teacher without invitation or private controls", async () => {
+    api.mockResolvedValueOnce({
+      assignments: [
+        { id: "team1", name: "Equipo Norte", status: "draft", members: [{ id: "candidate1", fullName: "Estudiante Uno" }] },
+        { id: "team2", name: "Equipo Sur", status: "confirmed", members: [{ id: "candidate2", fullName: "Estudiante Dos" }] },
+      ],
+    });
     render(<TeacherDashboard />);
     expect(await screen.findByText("Equipo Norte")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Aceptar" })).toBeTruthy();
-    expect(screen.queryByText(/certificado/i)).toBeNull();
+    expect(screen.getByText("Equipo Sur")).toBeTruthy();
+    expect(screen.getByText("Estudiante Uno")).toBeTruthy();
+    expect(screen.getByText("Estudiante Dos")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /aceptar|rechazar/i })).toBeNull();
+    expect(screen.queryByText("Certificado de alumno regular")).toBeNull();
     expect(document.body.textContent).not.toContain("DNI");
   });
 
-  it("covers mentor selection, pending state and closed formation controls", async () => {
-    api.mockImplementation((path: string) => {
-      if (path.startsWith("/api/lomaton/mentors/eligible")) return Promise.resolve([{ id: "mentor1", fullName: "Docente Uno", department: "FACEN", externalDescription: "" }]);
-      return Promise.resolve({ assignment: null, invitations: [{ id: "invite1", status: "pending", mentor: { id: "mentor1", fullName: "Docente Uno", department: "FACEN", externalDescription: "" } }] });
-    });
-    render(<TeamMentorCard teamId="team1" formationOpen={false} />);
-    expect(await screen.findByText(/Docente Uno · pendiente/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Invitar" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Retirar" }) as HTMLButtonElement).disabled).toBe(true);
+  it("shows an empty state when the teacher has no assigned teams", async () => {
+    api.mockResolvedValueOnce({ assignments: [] });
+    render(<TeacherDashboard />);
+    expect(await screen.findByText("Todavía no tenés equipos asignados.")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("filters mentors by public fields, clears hidden selections and submits the selected id", async () => {
-    const mentors = [
-      { id: "mentor1", fullName: "Ángela Núñez", department: "FACEN", externalDescription: "" },
-      { id: "mentor2", fullName: "Carlos Ruiz", department: "", externalDescription: "Robótica aplicada" },
-    ];
-    api.mockImplementation((path: string) => {
-      if (path.startsWith("/api/lomaton/mentors/eligible")) return Promise.resolve(mentors);
-      return Promise.resolve({ assignment: null, invitations: [] });
+  it("explains that the organization assigns a mentor and exposes no student controls", async () => {
+    api.mockResolvedValueOnce({ assignment: null });
+    render(<TeamMentorCard teamId="team1" formationOpen={false} />);
+    expect(await screen.findByText(/La organización realizará la asignación/)).toBeTruthy();
+    expect(screen.queryByLabelText("Buscar docente")).toBeNull();
+    expect(screen.queryByRole("button", { name: /invitar|retirar/i })).toBeNull();
+  });
+
+  it("shows the mentor assigned by administration as read-only", async () => {
+    api.mockResolvedValueOnce({
+      assignment: { id: "mentorship1", mentor: { id: "mentor1", fullName: "Ángela Núñez", department: "FACEN", externalDescription: "" } },
     });
-
     render(<TeamMentorCard teamId="team1" formationOpen />);
-    const search = await screen.findByLabelText("Buscar docente");
-    const select = screen.getByLabelText("Docente disponible") as HTMLSelectElement;
-    const invite = screen.getByRole("button", { name: "Invitar" }) as HTMLButtonElement;
-
-    fireEvent.change(search, { target: { value: "robotica" } });
-    expect(screen.getByRole("option", { name: /Carlos Ruiz/ })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: /Ángela Núñez/ })).toBeNull();
-    fireEvent.change(select, { target: { value: "mentor2" } });
-    expect(invite.disabled).toBe(false);
-
-    fireEvent.change(search, { target: { value: "facen" } });
-    expect(select.value).toBe("");
-    expect(invite.disabled).toBe(true);
-
-    fireEvent.change(search, { target: { value: "robotica" } });
-    fireEvent.change(select, { target: { value: "mentor2" } });
-    fireEvent.click(invite);
-    await waitFor(() => expect(api).toHaveBeenCalledWith(
-      "/api/lomaton/teams/team1/mentor-invitations",
-      { method: "POST", body: { mentorId: "mentor2" } },
-    ));
+    expect(await screen.findByText("Ángela Núñez")).toBeTruthy();
+    expect(screen.getByText("FACEN")).toBeTruthy();
+    expect(api).toHaveBeenCalledTimes(1);
   });
 
   it("filters available students by name or email and announces empty results", async () => {
@@ -125,10 +113,7 @@ describe("participant portal components", () => {
       collection: (name: keyof typeof collections) => collections[name],
       filter: (expression: string) => expression,
     });
-    api.mockImplementation((path: string) => {
-      if (path.startsWith("/api/lomaton/mentors/eligible")) return Promise.resolve([]);
-      return Promise.resolve({ assignment: null, invitations: [] });
-    });
+    api.mockResolvedValue({ assignment: null });
 
     render(<CandidateDashboard candidateId={owner.id} />);
     const search = await screen.findByLabelText("Buscar estudiante");
@@ -149,22 +134,6 @@ describe("participant portal components", () => {
     fireEvent.change(search, { target: { value: "sin coincidencias" } });
     expect(await screen.findByText("No hay estudiantes que coincidan con la búsqueda.")).toBeTruthy();
     expect(select.disabled).toBe(true);
-  });
-
-  it("keeps invite search controls reachable by keyboard", async () => {
-    api.mockImplementation((path: string) => {
-      if (path.startsWith("/api/lomaton/mentors/eligible")) {
-        return Promise.resolve([{ id: "mentor1", fullName: "Docente Uno", department: "FACEN", externalDescription: "" }]);
-      }
-      return Promise.resolve({ assignment: null, invitations: [] });
-    });
-    render(<TeamMentorCard teamId="team1" formationOpen />);
-    await screen.findByText("1 docente disponible.");
-    const user = userEvent.setup();
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByLabelText("Buscar docente"));
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByLabelText("Docente disponible"));
   });
 
   it("keeps primary controls reachable by keyboard", async () => {

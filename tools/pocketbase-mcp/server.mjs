@@ -16,6 +16,7 @@ import {
   mentorInvitationsCollection,
   participantProfileFields,
   participantUserFields,
+  planMentorInvitationCancellation,
   planStudentCertificateReviewBackfill,
   registrationsCollection,
   serviceAccountsCollection,
@@ -311,6 +312,37 @@ const handlers = {
       const created = await pb.collections.create(teamMentorshipsCollection(teams.id, mentors.id));
       byName.set(created.name, created);
       actions.push("created:team_mentorships");
+    }
+
+    const mentorships = byName.get("team_mentorships");
+    if (mentorships) {
+      const indexes = (mentorships.indexes || []).filter(
+        (index) => !index.includes("idx_team_mentorships_mentor"),
+      );
+      if (!indexes.some((index) => index.includes("idx_team_mentorships_mentor_lookup"))) {
+        indexes.push("CREATE INDEX idx_team_mentorships_mentor_lookup ON team_mentorships (mentor)");
+      }
+      if (JSON.stringify(indexes) !== JSON.stringify(mentorships.indexes || [])) {
+        const updated = await pb.collections.update(mentorships.id, { indexes });
+        byName.set("team_mentorships", updated);
+        actions.push("updated:team_mentorships_unlimited_mentor_capacity");
+      }
+    }
+
+    const pendingMentorInvitations = await pb.collection("mentor_invitations").getFullList({
+      filter: "status = 'pending'",
+    });
+    const cancelledMentorInvitations = planMentorInvitationCancellation(
+      pendingMentorInvitations,
+      new Date().toISOString(),
+    );
+    if (cancelledMentorInvitations.length) {
+      const batch = pb.createBatch();
+      for (const update of cancelledMentorInvitations) {
+        batch.collection("mentor_invitations").update(update.id, update.data);
+      }
+      await batch.send();
+      actions.push(`cancelled:mentor_invitations:${cancelledMentorInvitations.length}`);
     }
 
     const certificates = byName.get("student_certificates");

@@ -48,6 +48,9 @@ export function AdminTeamManager() {
   const candidates = useMemo(() => new Map(snapshot?.candidates.map((item) => [item.id, item]) ?? []), [snapshot]);
   const occupied = useMemo(() => new Set(snapshot?.memberships.map((item) => String(item.candidate)) ?? []), [snapshot]);
   const available = snapshot?.candidates.filter((candidate) => candidate.active && !occupied.has(candidate.id)) ?? [];
+  const availableMentors = snapshot?.mentors.filter(
+    (mentor) => mentor.active && mentor.mentorInterest === "yes",
+  ) ?? [];
 
   return (
     <section className="panel" aria-labelledby="teams-admin-title">
@@ -68,7 +71,6 @@ export function AdminTeamManager() {
           const invitations = snapshot.invitations.filter((item) => item.team === team.id && item.status === "pending");
           const mentorship = snapshot.mentorships.find((item) => item.team === team.id);
           const mentor = mentorship ? snapshot.mentors.find((item) => item.id === mentorship.mentor) : undefined;
-          const mentorInvitations = snapshot.mentorInvitations.filter((item) => item.team === team.id && item.status === "pending");
           return <article className="team-admin-card" key={team.id}>
             <div className="section-heading"><div><h3>{String(team.name)}</h3><span className={`status-pill status-${String(team.status)}`}>{String(team.status)}</span></div><button className="danger-button" type="button" disabled={busy} onClick={() => { if (window.confirm(`¿Disolver ${String(team.name)}?`)) void command(`/api/lomaton/admin/teams/${team.id}`, "DELETE", {}, "Equipo disuelto."); }}>Disolver</button></div>
             <form action={(formData) => command(`/api/lomaton/admin/teams/${team.id}`, "PATCH", { name: formData.get("name"), ownerCandidateId: formData.get("ownerCandidateId") }, "Equipo actualizado.")} className="search-form">
@@ -78,8 +80,14 @@ export function AdminTeamManager() {
             </form>
             <ul className="member-list">{members.map((candidate) => <li key={candidate.id}><span>{candidateName(candidate)} {candidate.ftcaStatus === "confirmed" ? "· FTCA" : ""}{candidate.id === team.owner ? " · responsable" : ""}</span>{candidate.id !== team.owner ? <button className="text-button" type="button" disabled={busy} onClick={() => void command(`/api/lomaton/admin/teams/${team.id}/members/${candidate.id}`, "DELETE", {}, "Miembro retirado.")}>Retirar</button> : null}</li>)}</ul>
             <p><strong>Mentor:</strong> {mentor ? `${String(mentor.fullName)}${mentor.department ? ` · ${String(mentor.department)}` : ""}` : "Sin asignar"}</p>
+            {availableMentors.length ? <form action={(formData) => command(`/api/lomaton/admin/teams/${team.id}/mentor`, "PUT", { mentorId: formData.get("mentorId") }, mentorship ? "Mentoría reemplazada por administración." : "Mentoría asignada por administración.")} className="search-form">
+              <select key={mentor?.id || "unassigned"} name="mentorId" required defaultValue={mentor?.id || ""} aria-label={`Mentor de ${String(team.name)}`}>
+                <option value="">Elegir docente</option>
+                {availableMentors.map((item) => <option key={item.id} value={item.id}>{String(item.fullName)}{item.department ? ` · ${String(item.department)}` : ""}</option>)}
+              </select>
+              <button className="secondary-button" disabled={busy}>{mentorship ? "Reemplazar mentor" : "Asignar mentor"}</button>
+            </form> : <p className="muted">No hay docentes activos con interés de mentoría.</p>}
             {mentorship ? <button className="text-button" type="button" disabled={busy} onClick={() => void command(`/api/lomaton/admin/team-mentorships/${mentorship.id}`, "DELETE", {}, "Mentoría retirada por administración.")}>Retirar mentoría</button> : null}
-            {mentorInvitations.map((invitation) => { const invited = snapshot.mentors.find((item) => item.id === invitation.mentor); return <div className="invitation-card" key={invitation.id}><span>Invitación docente: {String(invited?.fullName || "Docente")}</span><button className="text-button" type="button" disabled={busy} onClick={() => void command(`/api/lomaton/admin/mentor-invitations/${invitation.id}/resolve`, "POST", {}, "Invitación docente cancelada.")}>Cancelar</button></div>; })}
             {Number(team.memberCount) < 4 && available.length > 0 ? <form action={(formData) => command(`/api/lomaton/admin/teams/${team.id}/members/${String(formData.get("candidateId"))}`, "PUT", {}, "Miembro incorporado.")} className="search-form"><select name="candidateId" required aria-label={`Agregar miembro a ${String(team.name)}`}><option value="">Agregar candidato</option>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidateName(candidate)}</option>)}</select><button className="secondary-button" disabled={busy}>Agregar</button></form> : null}
             {invitations.map((invitation) => <div className="invitation-card" key={invitation.id}><span>Invitación: {candidateName(candidates.get(String(invitation.candidate)))}</span><div className="form-actions"><button className="text-button" type="button" disabled={busy} onClick={() => void command(`/api/lomaton/admin/invitations/${invitation.id}/resolve`, "POST", { resolution: "rejected" }, "Invitación rechazada.")}>Rechazar</button><button className="primary-button" type="button" disabled={busy} onClick={() => void command(`/api/lomaton/admin/invitations/${invitation.id}/resolve`, "POST", { resolution: "accepted" }, "Invitación aceptada por administración.")}>Aceptar</button></div></div>)}
           </article>;

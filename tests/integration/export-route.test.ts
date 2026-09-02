@@ -92,14 +92,18 @@ describe("admin export Route Handler", () => {
       memberships: [{ id: "m1", team: "t1", candidate: "c1" }], invitations: [],
       mentors: [{ id: "mentor1", fullName: "Docente Uno", department: "FACEN", email: "private@example.test", dni: "secret-dni" }],
       mentorships: [{ id: "tm1", team: "t1", mentor: "mentor1" }],
-      mentorInvitations: [{ id: "mi1", team: "t1", mentor: "mentor1", status: "accepted" }],
+      mentorInvitations: [
+        { id: "mi1", team: "t1", mentor: "mentor1", status: "accepted" },
+        { id: "mi2", team: "t1", mentor: "mentor1", status: "cancelled" },
+      ],
     });
     const response = await GET(new Request(`https://app.example/api/exports/teams/${format}`, { headers: { Authorization: "Bearer admin" } }), { params: Promise.resolve({ kind: "teams", format }) });
     expect(response.status).toBe(200);
     if (format === "csv") {
       const csv = await response.text();
-      expect(csv).toContain("mentor,departamento_mentor,invitaciones_mentoria_pendientes");
+      expect(csv).toContain("mentor,departamento_mentor,historial_invitaciones_mentoria");
       expect(csv).toContain("Docente Uno,FACEN");
+      expect(csv).toContain("Docente Uno · accepted | Docente Uno · cancelled");
       expect(csv).not.toContain("private@example.test");
       expect(csv).not.toContain("secret-dni");
     } else {
@@ -108,6 +112,8 @@ describe("admin export Route Handler", () => {
       const values = workbook.getWorksheet("Equipos")?.getSheetValues().flat().join(" | ") || "";
       expect(values).toContain("Mentor");
       expect(values).toContain("Docente Uno");
+      expect(values).toContain("Historial de invitaciones de mentoría");
+      expect(values).toContain("cancelled");
       expect(values).not.toContain("private@example.test");
       expect(values).not.toContain("secret-dni");
     }

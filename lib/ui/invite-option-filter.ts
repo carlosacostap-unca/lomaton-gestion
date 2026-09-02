@@ -6,13 +6,6 @@ type CandidateInviteOption = {
   email?: unknown;
 };
 
-type MentorInviteOption = {
-  id: unknown;
-  fullName?: unknown;
-  department?: unknown;
-  externalDescription?: unknown;
-};
-
 export function normalizeInviteSearch(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -37,28 +30,11 @@ export function candidateInviteSearchFields(candidate: CandidateInviteOption) {
   ];
 }
 
-export function mentorInviteSearchFields(mentor: MentorInviteOption) {
-  return [
-    mentor.fullName,
-    mentor.department,
-    mentor.externalDescription,
-  ];
-}
-
 export function filterCandidateInviteOptions<T extends CandidateInviteOption>(
   candidates: T[],
   query: string,
 ) {
   return candidates.filter((candidate) =>
     matchesAuthorizedFields(query, candidateInviteSearchFields(candidate)),
-  );
-}
-
-export function filterMentorInviteOptions<T extends MentorInviteOption>(
-  mentors: T[],
-  query: string,
-) {
-  return mentors.filter((mentor) =>
-    matchesAuthorizedFields(query, mentorInviteSearchFields(mentor)),
   );
 }

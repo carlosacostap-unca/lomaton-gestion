@@ -54,7 +54,7 @@ La aplicación idempotente crea o actualiza solamente elementos conocidos. No el
 
 El rollout del portal debe mantener este orden: backup; esquema aditivo; backfill de versiones y vínculos; segunda ejecución idempotente; validación estricta; pruebas de privacidad con token humano; y sólo entonces despliegue de Next.js. La versión anterior de la aplicación ignora los campos y colecciones nuevas. No desplegar las rutas nuevas antes del esquema porque el bootstrap docente depende de `users.registration` y `mentor_profiles`.
 
-La aceptación del portal usa datos ficticios identificables: un estudiante, un docente disponible, dos equipos responsables y un administrador. Verificar que ambos equipos pueden invitar al docente, que sólo una aceptación crea mentoría, que las invitaciones incompatibles se cancelan, que los contadores y FTCA no cambian, que la disolución libera al mentor y que los CSV/XLSX muestran la mentoría en columnas separadas. Eliminar sólo los registros E2E creados y repetir los conteos de línea base.
+La aceptación del portal usa datos ficticios identificables: estudiantes, docentes elegibles, dos equipos responsables y un administrador. Antes del despliegue, verificar que la transición canceló todas las invitaciones de mentoría pendientes y conservó su historial. Comprobar que el administrador puede asignar el mismo docente a ambos equipos, reemplazar o retirar cada mentoría sin alterar las otras, que cada equipo conserva como máximo un mentor, que los contadores y FTCA no cambian y que los CSV/XLSX muestran la mentoría vigente y el historial de invitaciones en columnas separadas. Eliminar sólo los registros E2E creados y repetir los conteos de línea base.
 
 ## Google OAuth2
 

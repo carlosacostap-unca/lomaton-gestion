@@ -13,10 +13,7 @@ const getProfile = vi.fn();
 const updateProfile = vi.fn();
 const getMentorDashboard = vi.fn();
 const getTeamMentor = vi.fn();
-const eligible = vi.fn();
-const invite = vi.fn();
-const resolve = vi.fn();
-const withdraw = vi.fn();
+const assignMentor = vi.fn();
 
 vi.doMock("@/lib/pocketbase/server", () => ({
   requirePocketBaseUser: requireUser,
@@ -25,13 +22,9 @@ vi.doMock("@/lib/pocketbase/server", () => ({
 }));
 vi.doMock("@/lib/domain/participant-profile", () => ({ getOwnProfile: getProfile, updateOwnProfile: updateProfile }));
 vi.doMock("@/lib/domain/mentor-commands", () => ({
+  assignAdminMentor: assignMentor,
   getOwnMentorDashboard: getMentorDashboard,
   getTeamMentorState: getTeamMentor,
-  listEligibleMentors: eligible,
-  inviteMentor: invite,
-  resolveMentorInvitation: resolve,
-  withdrawMentorInvitation: withdraw,
-  resolveAdminMentorInvitation: vi.fn(),
   removeAdminMentorship: vi.fn(),
 }));
 vi.doMock("@/lib/domain/team-commands", () => ({ createTeam: vi.fn(), disbandOwnTeam: vi.fn(), inviteCandidate: vi.fn(), resolveOwnInvitation: vi.fn(), withdrawInvitation: vi.fn() }));
@@ -53,11 +46,9 @@ describe("participant catch-all routes", () => {
     createService.mockResolvedValue(service);
     getProfile.mockResolvedValue({ role: "student", version: 1, readOnly: { fullName: "Ada" }, editable: { phone: "12345" } });
     updateProfile.mockResolvedValue({ role: "student", version: 2 });
-    getMentorDashboard.mockResolvedValue({ assignment: null, invitations: [] });
-    eligible.mockResolvedValue([]);
-    invite.mockResolvedValue({ id: "invite1" });
-    resolve.mockResolvedValue({ assignment: null, invitations: [] });
-    withdraw.mockResolvedValue({ id: "invite1", status: "withdrawn" });
+    getMentorDashboard.mockResolvedValue({ assignments: [] });
+    getTeamMentor.mockResolvedValue({ assignment: null });
+    assignMentor.mockResolvedValue({ id: "assignment1", team: "team1", mentor: "mentor1", source: "admin" });
   });
 
   it("returns 401 for an unauthenticated own-profile request", async () => {
@@ -79,7 +70,7 @@ describe("participant catch-all routes", () => {
     expect(updateProfile).not.toHaveBeenCalled();
   });
 
-  it("preserves domain conflicts and exposes mentor invitation operations", async () => {
+  it("preserves domain conflicts and rejects legacy mentor invitation routes", async () => {
     updateProfile.mockRejectedValueOnce(new ApiError(409, "Recargá", "profile_version_conflict"));
     const conflict = await route.PATCH(new Request("https://app.test/api/lomaton/me/profile", {
       method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ expectedVersion: 1, phone: "12345" }),
@@ -87,15 +78,58 @@ describe("participant catch-all routes", () => {
     expect(conflict.status).toBe(409);
     await expect(conflict.json()).resolves.toMatchObject({ error: "profile_version_conflict" });
 
-    const created = await route.POST(new Request("https://app.test/api/lomaton/teams/team1/mentor-invitations", {
+    const legacyCreate = await route.POST(new Request("https://app.test/api/lomaton/teams/team1/mentor-invitations", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mentorId: "mentor1" }),
     }), context(["teams", "team1", "mentor-invitations"]));
-    expect(created.status).toBe(201);
-    expect(invite).toHaveBeenCalledWith(service, user, "team1", "mentor1");
+    expect(legacyCreate.status).toBe(404);
 
-    await route.POST(new Request("https://app.test/api/lomaton/mentor-invitations/invite1/accept", { method: "POST" }), context(["mentor-invitations", "invite1", "accept"]));
-    expect(resolve).toHaveBeenCalledWith(service, user, "invite1", "accepted");
-    await route.DELETE(new Request("https://app.test/api/lomaton/mentor-invitations/invite1", { method: "DELETE" }), context(["mentor-invitations", "invite1"]));
-    expect(withdraw).toHaveBeenCalledWith(service, user, "invite1");
+    const legacyAccept = await route.POST(
+      new Request("https://app.test/api/lomaton/mentor-invitations/invite1/accept", { method: "POST" }),
+      context(["mentor-invitations", "invite1", "accept"]),
+    );
+    expect(legacyAccept.status).toBe(404);
+    const legacyDelete = await route.DELETE(
+      new Request("https://app.test/api/lomaton/mentor-invitations/invite1", { method: "DELETE" }),
+      context(["mentor-invitations", "invite1"]),
+    );
+    expect(legacyDelete.status).toBe(404);
+    const legacyList = await route.GET(
+      new Request("https://app.test/api/lomaton/mentors/eligible?teamId=team1"),
+      context(["mentors", "eligible"]),
+    );
+    expect(legacyList.status).toBe(404);
+    expect(assignMentor).not.toHaveBeenCalled();
+  });
+
+  it("assigns mentors only through the administrator route", async () => {
+    const response = await route.PUT(new Request(
+      "https://app.test/api/lomaton/admin/teams/team1/mentor",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mentorId: "mentor1", reason: "coordinación" }),
+      },
+    ), context(["admin", "teams", "team1", "mentor"]));
+
+    expect(response.status).toBe(200);
+    expect(assignMentor).toHaveBeenCalledWith(
+      service,
+      expect.objectContaining({ isAdmin: true }),
+      "team1",
+      "mentor1",
+      "coordinación",
+    );
+
+    requireAdmin.mockRejectedValueOnce(new ApiError(403, "Sin permiso.", "admin_required"));
+    const denied = await route.PUT(new Request(
+      "https://app.test/api/lomaton/admin/teams/team2/mentor",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mentorId: "mentor1", reason: "" }),
+      },
+    ), context(["admin", "teams", "team2", "mentor"]));
+    expect(denied.status).toBe(403);
+    expect(assignMentor).toHaveBeenCalledTimes(1);
   });
 });

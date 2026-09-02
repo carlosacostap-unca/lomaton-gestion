@@ -346,9 +346,18 @@ export function teamMentorshipsCollection(teamsCollectionId, mentorsCollectionId
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_team_mentorships_team ON team_mentorships (team)",
-      "CREATE UNIQUE INDEX idx_team_mentorships_mentor ON team_mentorships (mentor)",
+      "CREATE INDEX idx_team_mentorships_mentor_lookup ON team_mentorships (mentor)",
     ],
   };
+}
+
+export function planMentorInvitationCancellation(records, resolvedAt) {
+  return records
+    .filter((record) => String(record.status || "") === "pending")
+    .map((record) => ({
+      id: record.id,
+      data: { status: "cancelled", resolvedAt },
+    }));
 }
 
 export function candidateProjectionFields(registrationsCollectionId) {

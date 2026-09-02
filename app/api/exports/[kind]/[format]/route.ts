@@ -65,11 +65,12 @@ export async function GET(
       }
       const mentors = new Map(snapshot.mentors.map((mentor) => [mentor.id, mentor]));
       const mentorshipByTeam = new Map(snapshot.mentorships.map((item) => [String(item.team), item]));
-      const pendingMentorsByTeam = new Map<string, string[]>();
-      for (const invitation of snapshot.mentorInvitations.filter((item) => item.status === "pending")) {
+      const mentorInvitationHistoryByTeam = new Map<string, string[]>();
+      for (const invitation of snapshot.mentorInvitations) {
         const mentor = mentors.get(String(invitation.mentor));
         const teamId = String(invitation.team);
-        pendingMentorsByTeam.set(teamId, [...(pendingMentorsByTeam.get(teamId) || []), String(mentor?.fullName || "")].filter(Boolean));
+        const label = [String(mentor?.fullName || "Docente"), String(invitation.status || "sin estado")].join(" · ");
+        mentorInvitationHistoryByTeam.set(teamId, [...(mentorInvitationHistoryByTeam.get(teamId) || []), label]);
       }
       rows = snapshot.teams.map((team) => ({
         equipo: String(team.name ?? ""),
@@ -81,7 +82,7 @@ export async function GET(
         condiciones_ftca: (byTeam.get(team.id) ?? []).map((candidate) => String(candidate.ftcaStatus ?? "")).join(" | "),
         mentor: String(mentors.get(String(mentorshipByTeam.get(team.id)?.mentor))?.fullName || ""),
         departamento_mentor: String(mentors.get(String(mentorshipByTeam.get(team.id)?.mentor))?.department || ""),
-        invitaciones_mentoria_pendientes: (pendingMentorsByTeam.get(team.id) || []).join(" | "),
+        historial_invitaciones_mentoria: (mentorInvitationHistoryByTeam.get(team.id) || []).join(" | "),
         advertencias: teamWarning(team),
       }));
       columns = [
@@ -91,7 +92,7 @@ export async function GET(
         { key: "condiciones_ftca", header: "Condiciones FTCA", width: 40 },
         { key: "mentor", header: "Mentor", width: 36 },
         { key: "departamento_mentor", header: "Departamento del mentor", width: 28 },
-        { key: "invitaciones_mentoria_pendientes", header: "Invitaciones de mentoría pendientes", width: 55 },
+        { key: "historial_invitaciones_mentoria", header: "Historial de invitaciones de mentoría", width: 55 },
         { key: "advertencias", header: "Advertencias", width: 50 },
       ];
     }
