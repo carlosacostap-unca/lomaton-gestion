@@ -5,6 +5,9 @@ export type ReportSnapshot = {
   teams: SnapshotRecord[];
   memberships: SnapshotRecord[];
   invitations: SnapshotRecord[];
+  mentors: SnapshotRecord[];
+  mentorInvitations: SnapshotRecord[];
+  mentorships: SnapshotRecord[];
 };
 
 export type TeamFilter = "all" | "problematic" | "draft" | "missing_ftca" | "complete" | "invalid";

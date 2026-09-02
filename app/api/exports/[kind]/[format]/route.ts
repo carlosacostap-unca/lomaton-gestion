@@ -63,6 +63,14 @@ export async function GET(
         const teamId = String(membership.team);
         byTeam.set(teamId, [...(byTeam.get(teamId) ?? []), candidate]);
       }
+      const mentors = new Map(snapshot.mentors.map((mentor) => [mentor.id, mentor]));
+      const mentorshipByTeam = new Map(snapshot.mentorships.map((item) => [String(item.team), item]));
+      const pendingMentorsByTeam = new Map<string, string[]>();
+      for (const invitation of snapshot.mentorInvitations.filter((item) => item.status === "pending")) {
+        const mentor = mentors.get(String(invitation.mentor));
+        const teamId = String(invitation.team);
+        pendingMentorsByTeam.set(teamId, [...(pendingMentorsByTeam.get(teamId) || []), String(mentor?.fullName || "")].filter(Boolean));
+      }
       rows = snapshot.teams.map((team) => ({
         equipo: String(team.name ?? ""),
         estado: String(team.status ?? ""),
@@ -71,13 +79,20 @@ export async function GET(
         miembros: (byTeam.get(team.id) ?? []).map(candidateDisplayName).join(" | "),
         emails: (byTeam.get(team.id) ?? []).map((candidate) => String(candidate.email ?? "")).join(" | "),
         condiciones_ftca: (byTeam.get(team.id) ?? []).map((candidate) => String(candidate.ftcaStatus ?? "")).join(" | "),
+        mentor: String(mentors.get(String(mentorshipByTeam.get(team.id)?.mentor))?.fullName || ""),
+        departamento_mentor: String(mentors.get(String(mentorshipByTeam.get(team.id)?.mentor))?.department || ""),
+        invitaciones_mentoria_pendientes: (pendingMentorsByTeam.get(team.id) || []).join(" | "),
         advertencias: teamWarning(team),
       }));
       columns = [
         { key: "equipo", header: "Equipo", width: 28 }, { key: "estado", header: "Estado" },
         { key: "integrantes", header: "Integrantes" }, { key: "ftca_confirmados", header: "FTCA confirmados" },
         { key: "miembros", header: "Miembros", width: 60 }, { key: "emails", header: "Emails", width: 60 },
-        { key: "condiciones_ftca", header: "Condiciones FTCA", width: 40 }, { key: "advertencias", header: "Advertencias", width: 50 },
+        { key: "condiciones_ftca", header: "Condiciones FTCA", width: 40 },
+        { key: "mentor", header: "Mentor", width: 36 },
+        { key: "departamento_mentor", header: "Departamento del mentor", width: 28 },
+        { key: "invitaciones_mentoria_pendientes", header: "Invitaciones de mentoría pendientes", width: 55 },
+        { key: "advertencias", header: "Advertencias", width: 50 },
       ];
     }
 

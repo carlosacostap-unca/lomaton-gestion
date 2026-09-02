@@ -6,7 +6,8 @@ import {
   registrationImportRowSchema,
   revalidateRegistrationRows,
 } from "@/lib/import/registrations";
-import { requirePocketBaseAdmin } from "@/lib/pocketbase/server";
+import { selfManagedImportDifferences } from "@/lib/import/registration-self-management";
+import { createPocketBaseServiceClient, requirePocketBaseAdmin } from "@/lib/pocketbase/server";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,10 @@ function digestPreview(fileDigest: string, valid: unknown[], review: unknown[]) 
 export async function POST(request: Request) {
   try {
     const { env } = await requirePocketBaseAdmin(request.headers.get("authorization"));
+    const pb = await createPocketBaseServiceClient();
+    const registrations = await pb.collection("registrations").getFullList({
+      fields: "id,emailNormalized,dniNormalized,phone,department,academicUnit,career,externalTeacherDescription,mentorInterest,selfManagedFields",
+    });
     if (request.headers.get("content-type")?.includes("application/json")) {
       const parsed = revalidationSchema.safeParse(await request.json());
       if (!parsed.success || parsed.data.rows.length > env.importMaxRows) {
@@ -39,6 +44,7 @@ export async function POST(request: Request) {
         fileName: parsed.data.fileName,
         fileType: parsed.data.fileType,
         digest: digestPreview("revalidated", preview.valid, preview.review),
+        selfManagedDifferences: selfManagedImportDifferences(registrations, parsed.data.rows),
         ...preview,
       });
     }
@@ -60,6 +66,7 @@ export async function POST(request: Request) {
       fileName: file.name,
       fileType: file.name.toLowerCase().endsWith(".xlsx") ? "xlsx" : "csv",
       digest: digestPreview(fileDigest, preview.valid, preview.review),
+      selfManagedDifferences: selfManagedImportDifferences(registrations, preview.items.map((item) => item.row)),
       ...preview,
     });
   } catch (error) {

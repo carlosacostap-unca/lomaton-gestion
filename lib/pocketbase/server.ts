@@ -11,6 +11,7 @@ export type LomatonUser = RecordModel & {
   enabled: boolean;
   isAdmin: boolean;
   candidate?: string;
+  registration?: string;
   displayName?: string;
 };
 

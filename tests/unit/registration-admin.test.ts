@@ -68,6 +68,8 @@ function baseSeed(): Record<string, RecordItem[]> {
       fullName: "Persona Original",
       emailNormalized: "persona@example.test",
       dniNormalized: "30111222",
+      profileVersion: 3,
+      selfManagedFields: ["phone", "career"],
     }],
     candidates: [{
       id: "candidate000001",
@@ -93,7 +95,7 @@ describe("admin registration editing", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(result.affectedTeamId).toBe("team0000000001");
     expect(operations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ collection: "registrations", method: "update", id: "registration001" }),
+      expect.objectContaining({ collection: "registrations", method: "update", id: "registration001", data: expect.objectContaining({ profileVersion: 4, selfManagedFields: [] }) }),
       expect.objectContaining({ collection: "candidates", method: "update", id: "candidate000001" }),
       expect.objectContaining({ collection: "teams", method: "update", id: "team0000000001", options: { query: { expected_member_count: 3 } } }),
       expect.objectContaining({ collection: "audit_logs", method: "create" }),
@@ -109,6 +111,19 @@ describe("admin registration editing", () => {
       relationship: "teacher",
       ftcaStatus: "pending",
     })).rejects.toMatchObject({ status: 409, code: "candidate_has_team" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("blocks deactivating or reclassifying a mentor with a current team", async () => {
+    const seed = baseSeed();
+    seed.team_memberships = [];
+    seed.candidates = [];
+    seed.mentor_profiles = [{ id: "mentor00000001", registration: "registration001", active: true }];
+    seed.team_mentorships = [{ id: "mentorship0001", mentor: "mentor00000001", team: "team0000000001" }];
+    const { pb, send } = fakePocketBase(seed);
+    await expect(updateAdminRegistration(pb, admin, "registration001", {
+      ...update, relationship: "teacher", ftcaStatus: "pending", active: false,
+    })).rejects.toMatchObject({ status: 409, code: "mentor_has_team" });
     expect(send).not.toHaveBeenCalled();
   });
 });

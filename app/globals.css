@@ -119,6 +119,10 @@ th { color: var(--green); font-size: .8rem; text-transform: uppercase; }
 .member-list { display: grid; gap: .45rem; padding: 0; list-style: none; }
 .member-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; }
+.profile-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.profile-summary div { padding: .8rem; border-radius: .65rem; background: #eef2e7; }
+.profile-summary dt { color: var(--muted); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
+.profile-summary dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
 
 @media (max-width: 38rem) {
   .app-header { align-items: flex-start; flex-direction: column; }

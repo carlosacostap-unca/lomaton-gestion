@@ -130,11 +130,14 @@ export async function updateAdminRegistration(
         filter: pb.filter("candidate = {:candidate}", { candidate: candidate.id }),
       }).then((items) => items[0] ?? null)
     : null;
-  const users = candidate
-    ? await pb.collection("users").getFullList({
-        filter: pb.filter("candidate = {:candidate}", { candidate: candidate.id }),
-      })
-    : [];
+  const users = await pb.collection("users").getFullList({
+    filter: candidate
+      ? pb.filter("registration = {:registration} || candidate = {:candidate}", { registration: registration.id, candidate: candidate.id })
+      : pb.filter("registration = {:registration}", { registration: registration.id }),
+  });
+  const mentorship = mentor
+    ? await pb.collection("team_mentorships").getFullList({ filter: pb.filter("mentor = {:mentor}", { mentor: mentor.id }) }).then((items) => items[0] ?? null)
+    : null;
 
   if (input.relationship === "teacher" && membership) {
     throw new ApiError(
@@ -142,6 +145,9 @@ export async function updateAdminRegistration(
       "Retirá a la persona de su equipo antes de reclasificarla como docente.",
       "candidate_has_team",
     );
+  }
+  if (mentorship && (input.relationship !== "teacher" || !input.active)) {
+    throw new ApiError(409, "Resolvé la mentoría vigente antes de desactivar o reclasificar al docente.", "mentor_has_team");
   }
 
   const email = input.email.trim();
@@ -168,6 +174,8 @@ export async function updateAdminRegistration(
     termsAccepted: input.termsAccepted,
     mediaAuthorized: input.mediaAuthorized,
     reviewStatus: "ready",
+    selfManagedFields: [],
+    profileVersion: Number(registration.profileVersion || 0) + 1,
   };
   const batch = pb.createBatch();
   batch.collection("registrations").update(registration.id, nextRegistration);
@@ -180,7 +188,8 @@ export async function updateAdminRegistration(
     for (const user of users) {
       batch.collection("users").update(user.id, {
         candidate: "",
-        enabled: false,
+        registration: input.active ? registration.id : "",
+        enabled: input.active,
         displayName: input.fullName.trim(),
       });
     }
@@ -213,6 +222,7 @@ export async function updateAdminRegistration(
     for (const user of users) {
       batch.collection("users").update(user.id, {
         candidate: emailChanged ? "" : candidateId,
+        registration: emailChanged ? "" : registration.id,
         enabled: input.active && !emailChanged,
         displayName: input.fullName.trim(),
       });

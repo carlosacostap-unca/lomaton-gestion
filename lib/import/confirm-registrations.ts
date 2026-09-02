@@ -57,7 +57,27 @@ function registrationData(
     rawSource: row.rawSource,
     reviewStatus: "ready",
     importBatch,
+    profileVersion: 0,
+    selfManagedFields: [],
   };
+}
+
+export function preserveSelfManagedRegistrationFields(
+  existing: Record<string, unknown>,
+  imported: Record<string, unknown>,
+) {
+  const managed = new Set(Array.isArray(existing.selfManagedFields) ? existing.selfManagedFields.map(String) : []);
+  const next = { ...imported };
+  const differences: string[] = [];
+  for (const field of managed) {
+    if (!(field in imported)) continue;
+    if (String(existing[field] ?? "") !== String(imported[field] ?? "")) differences.push(field);
+    next[field] = existing[field];
+  }
+  next.profileVersion = Number(existing.profileVersion || 0);
+  next.selfManagedFields = [...managed];
+  next.selfEditedAt = existing.selfEditedAt || "";
+  return { next, differences };
 }
 
 function candidateData(row: RegistrationImportRow, registration: string) {
@@ -192,6 +212,7 @@ export async function confirmRegistrationImport(
     updated: 0,
     unchanged: 0,
     total: input.rows.length,
+    selfManagedDifferences: 0,
   };
   const affectedTeamIds = new Set<string>();
 
@@ -214,7 +235,12 @@ export async function confirmRegistrationImport(
 
     const existingRegistration = sameEmail ?? sameDni;
     const registrationId = existingRegistration?.id ?? recordId();
-    const nextRegistration = registrationData(row, importBatchId);
+    const importedRegistration = registrationData(row, importBatchId);
+    const preserved = existingRegistration
+      ? preserveSelfManagedRegistrationFields(existingRegistration, importedRegistration)
+      : { next: importedRegistration, differences: [] };
+    const nextRegistration = preserved.next;
+    result.selfManagedDifferences += preserved.differences.length;
     let rowChanged = false;
     let rowCreated = false;
 
@@ -254,7 +280,12 @@ export async function confirmRegistrationImport(
         }
       }
 
-      const nextMentor = mentorData(row, registrationId);
+      const nextMentor = {
+        ...mentorData(row, registrationId),
+        department: String(nextRegistration.department || ""),
+        externalDescription: String(nextRegistration.externalTeacherDescription || ""),
+        mentorInterest: String(nextRegistration.mentorInterest || "not_provided"),
+      };
       if (existingMentor) {
         if (recordChanged(existingMentor, nextMentor)) {
           batch.collection("mentor_profiles").update(existingMentor.id, nextMentor);

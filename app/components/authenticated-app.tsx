@@ -3,11 +3,11 @@
 import { useAuth } from "./auth-provider";
 
 export function AuthenticatedApp() {
-  const { user, logout } = useAuth();
+  const { user, participantRole, logout } = useAuth();
   if (!user) return null;
 
   const isAdmin = Boolean(user.isAdmin);
-  const isCandidate = Boolean(user.candidate);
+  const isParticipant = Boolean(user.registration);
 
   return (
     <main className="app-shell">
@@ -22,12 +22,12 @@ export function AuthenticatedApp() {
       </header>
 
       <section className="role-grid" aria-label="Áreas disponibles">
-        {isCandidate ? (
+        {isParticipant ? (
           <article className="role-card">
-            <span className="role-chip">Candidato</span>
-            <h2>Mi equipo</h2>
-            <p>Creá un equipo, revisá invitaciones y seguí su estado antes del plazo.</p>
-            <a href="/candidate">Ir al panel de candidato</a>
+            <span className="role-chip">{participantRole === "teacher" ? "Docente" : "Estudiante"}</span>
+            <h2>Mi portal</h2>
+            <p>Gestioná tu perfil, invitaciones y {participantRole === "teacher" ? "mentoría" : "equipo y certificado"}.</p>
+            <a href="/portal">Ir al portal</a>
           </article>
         ) : null}
 
@@ -41,7 +41,7 @@ export function AuthenticatedApp() {
         ) : null}
       </section>
 
-      {!isCandidate && !isAdmin ? (
+      {!isParticipant && !isAdmin ? (
         <div className="alert" role="alert">
           La cuenta está autenticada pero no tiene permisos activos. Contactá a la organización.
         </div>

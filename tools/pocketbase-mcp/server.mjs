@@ -13,12 +13,16 @@ import {
   dataVersionField,
   expectedFields,
   mentorProfilesCollection,
+  mentorInvitationsCollection,
+  participantProfileFields,
+  participantUserFields,
   planStudentCertificateReviewBackfill,
   registrationsCollection,
   serviceAccountsCollection,
   studentCertificatesCollection,
   studentCertificateReviewFields,
   studentCertificateTimestampFields,
+  teamMentorshipsCollection,
 } from "./lomaton-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,6 +101,7 @@ const tools = [
   }),
   tool("apply_lomaton_schema", "Aplica de forma idempotente el esquema, reglas y Batch API de Lomatón sin eliminar colecciones, campos ni registros. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("backfill_student_certificate_reviews", "Clasifica como pending solamente certificados existentes sin estado de revisión y verifica que archivo y metadatos permanezcan intactos. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
+  tool("backfill_participant_profiles", "Vincula usuarios con inscripciones vigentes e inicializa metadatos de autogestión de forma idempotente. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("ensure_service_account", "Crea o sincroniza la cuenta técnica usando POCKETBASE_SERVICE_EMAIL y POCKETBASE_SERVICE_PASSWORD, sin devolver el secreto. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("validate_hackathon_schema", "Compara las colecciones existentes con el esquema esperado de Lomatón.", {}),
 ];
@@ -252,6 +257,62 @@ const handlers = {
       actions.push("created:student_certificates");
     }
 
+    const registrationsForProfiles = byName.get("registrations");
+    const usersForProfiles = byName.get("users");
+    if (!registrationsForProfiles || !usersForProfiles) {
+      throw rpcError(-32020, "Faltan registrations o users para configurar los perfiles.");
+    }
+    const registrationFields = [...(registrationsForProfiles.fields || [])];
+    let registrationsChanged = false;
+    for (const field of participantProfileFields()) {
+      if (!registrationFields.some((current) => current.name === field.name)) {
+        registrationFields.push(field);
+        registrationsChanged = true;
+      }
+    }
+    if (registrationsChanged) {
+      const updated = await pb.collections.update(registrationsForProfiles.id, { fields: registrationFields });
+      byName.set("registrations", updated);
+      actions.push("updated:participant_profile_fields");
+    }
+
+    const userFields = [...(usersForProfiles.fields || [])];
+    let usersChanged = false;
+    for (const field of participantUserFields(registrationsForProfiles.id)) {
+      if (!userFields.some((current) => current.name === field.name)) {
+        userFields.push(field);
+        usersChanged = true;
+      }
+    }
+    const userIndexes = [...(usersForProfiles.indexes || [])];
+    if (!userIndexes.some((index) => index.includes("idx_users_registration"))) {
+      userIndexes.push("CREATE UNIQUE INDEX idx_users_registration ON users (registration) WHERE registration != ''");
+      usersChanged = true;
+    }
+    if (usersChanged) {
+      const updated = await pb.collections.update(usersForProfiles.id, { fields: userFields, indexes: userIndexes });
+      byName.set("users", updated);
+      actions.push("updated:users_registration");
+    }
+
+    if (!byName.has("mentor_invitations")) {
+      const teams = byName.get("teams");
+      const mentors = byName.get("mentor_profiles");
+      if (!teams || !mentors) throw rpcError(-32020, "Faltan teams o mentor_profiles para crear mentor_invitations.");
+      const created = await pb.collections.create(mentorInvitationsCollection(teams.id, mentors.id, usersForProfiles.id));
+      byName.set(created.name, created);
+      actions.push("created:mentor_invitations");
+    }
+
+    if (!byName.has("team_mentorships")) {
+      const teams = byName.get("teams");
+      const mentors = byName.get("mentor_profiles");
+      if (!teams || !mentors) throw rpcError(-32020, "Faltan teams o mentor_profiles para crear team_mentorships.");
+      const created = await pb.collections.create(teamMentorshipsCollection(teams.id, mentors.id));
+      byName.set(created.name, created);
+      actions.push("created:team_mentorships");
+    }
+
     const certificates = byName.get("student_certificates");
     const certificateUsers = byName.get("users");
     if (!certificates || !certificateUsers) {
@@ -374,6 +435,54 @@ const handlers = {
       preserved,
       remaining: remaining.length,
     };
+  },
+
+  async backfill_participant_profiles() {
+    requireWrites();
+    const pb = await authenticate();
+    const [registrations, users, candidates, mentors] = await Promise.all([
+      pb.collection("registrations").getFullList({ sort: "id" }),
+      pb.collection("users").getFullList({ sort: "id" }),
+      pb.collection("candidates").getFullList({ sort: "id" }),
+      pb.collection("mentor_profiles").getFullList({ sort: "id" }),
+    ]);
+    const registrationByEmail = new Map(registrations.map((record) => [String(record.emailNormalized || "").toLowerCase(), record]));
+    const candidateByRegistration = new Map(candidates.filter((record) => record.registration && record.active).map((record) => [String(record.registration), record]));
+    const candidateByEmail = new Map(candidates.filter((record) => record.active).map((record) => [String(record.emailNormalized || "").toLowerCase(), record]));
+    const mentorByRegistration = new Map(mentors.filter((record) => record.active).map((record) => [String(record.registration), record]));
+    const updates = [];
+
+    for (const registration of registrations) {
+      const data = {};
+      if (!Number.isInteger(registration.profileVersion) || Number(registration.profileVersion) < 0) data.profileVersion = 0;
+      if (!Array.isArray(registration.selfManagedFields)) data.selfManagedFields = [];
+      if (Object.keys(data).length) updates.push({ collection: "registrations", id: registration.id, data });
+    }
+    for (const user of users) {
+      const email = String(user.email || "").trim().toLowerCase();
+      const registration = registrationByEmail.get(email);
+      let registrationId = "";
+      let candidateId = "";
+      if (registration?.relationship === "teacher" && mentorByRegistration.has(registration.id)) {
+        registrationId = registration.id;
+      } else if (registration && registration.relationship !== "teacher") {
+        const candidate = candidateByRegistration.get(registration.id) || candidateByEmail.get(email);
+        if (candidate) {
+          registrationId = registration.id;
+          candidateId = candidate.id;
+        }
+      }
+      if (String(user.registration || "") !== registrationId || String(user.candidate || "") !== candidateId) {
+        updates.push({ collection: "users", id: user.id, data: { registration: registrationId, candidate: candidateId } });
+      }
+    }
+
+    for (let offset = 0; offset < updates.length; offset += 1000) {
+      const batch = pb.createBatch();
+      for (const update of updates.slice(offset, offset + 1000)) batch.collection(update.collection).update(update.id, update.data);
+      await batch.send();
+    }
+    return { registrations: registrations.length, users: users.length, updated: updates.length, idempotentWhenUpdatedIsZero: true };
   },
 
   async ensure_service_account() {

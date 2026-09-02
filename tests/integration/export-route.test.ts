@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import ExcelJS from "exceljs";
 
 vi.mock("server-only", () => ({}));
 
@@ -81,5 +82,34 @@ describe("admin export Route Handler", () => {
     expect(csv).not.toContain("admin-secret");
     expect(csv).not.toContain("hash-secret");
     expect(mocks.readSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["csv", "xlsx"] as const)("exports mentor columns separately in %s without private profile data", async (format) => {
+    mocks.readSnapshot.mockResolvedValue({
+      generatedAtUtc: "2026-09-02T12:00:00.000Z",
+      candidates: [{ id: "c1", fullName: "Estudiante Uno", email: "student@example.test", ftcaStatus: "confirmed", active: true }],
+      teams: [{ id: "t1", name: "Equipo Uno", status: "draft", memberCount: 1, ftcaConfirmedCount: 1 }],
+      memberships: [{ id: "m1", team: "t1", candidate: "c1" }], invitations: [],
+      mentors: [{ id: "mentor1", fullName: "Docente Uno", department: "FACEN", email: "private@example.test", dni: "secret-dni" }],
+      mentorships: [{ id: "tm1", team: "t1", mentor: "mentor1" }],
+      mentorInvitations: [{ id: "mi1", team: "t1", mentor: "mentor1", status: "accepted" }],
+    });
+    const response = await GET(new Request(`https://app.example/api/exports/teams/${format}`, { headers: { Authorization: "Bearer admin" } }), { params: Promise.resolve({ kind: "teams", format }) });
+    expect(response.status).toBe(200);
+    if (format === "csv") {
+      const csv = await response.text();
+      expect(csv).toContain("mentor,departamento_mentor,invitaciones_mentoria_pendientes");
+      expect(csv).toContain("Docente Uno,FACEN");
+      expect(csv).not.toContain("private@example.test");
+      expect(csv).not.toContain("secret-dni");
+    } else {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(new Uint8Array(await response.arrayBuffer()) as unknown as ExcelJS.Buffer);
+      const values = workbook.getWorksheet("Equipos")?.getSheetValues().flat().join(" | ") || "";
+      expect(values).toContain("Mentor");
+      expect(values).toContain("Docente Uno");
+      expect(values).not.toContain("private@example.test");
+      expect(values).not.toContain("secret-dni");
+    }
   });
 });

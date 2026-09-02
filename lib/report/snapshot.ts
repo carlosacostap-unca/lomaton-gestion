@@ -14,20 +14,31 @@ export async function readConsistentReportSnapshot(
       .collection("hackathon_settings")
       .getFirstListItem(pb.filter("key = {:key}", { key: "default" }));
     const version = Number(before.dataVersion ?? 0);
-    const [candidates, teams, memberships, invitations] = await Promise.all([
+    const [candidates, teams, memberships, invitations, mentorProfiles, mentorInvitations, mentorships, registrations] = await Promise.all([
       pb.collection("candidates").getFullList({ sort: "fullName" }),
       pb.collection("teams").getFullList({ sort: "name" }),
       pb.collection("team_memberships").getFullList({ sort: "created" }),
       pb.collection("team_invitations").getFullList({ sort: "created" }),
+      pb.collection("mentor_profiles").getFullList(),
+      pb.collection("mentor_invitations").getFullList({ sort: "created" }),
+      pb.collection("team_mentorships").getFullList({ sort: "created" }),
+      pb.collection("registrations").getFullList({ sort: "fullName" }),
     ]);
     const after = await pb.collection("hackathon_settings").getOne(before.id);
     if (version === Number(after.dataVersion ?? 0)) {
+      const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
       return {
         generatedAtUtc: new Date().toISOString(),
         candidates,
         teams,
         memberships,
         invitations,
+        mentors: mentorProfiles.map((mentor) => {
+          const registration = registrationById.get(String(mentor.registration));
+          return { id: mentor.id, fullName: String(registration?.fullName || ""), department: String(mentor.department || ""), active: Boolean(mentor.active), mentorInterest: String(mentor.mentorInterest || "") };
+        }),
+        mentorInvitations,
+        mentorships,
       };
     }
   }

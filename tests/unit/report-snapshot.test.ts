@@ -38,7 +38,7 @@ describe("consistent report snapshot", () => {
     const { pb, list } = fakePocketBase([1, 2], [2, 2]);
     const snapshot = await readConsistentReportSnapshot(pb);
     expect(snapshot.generatedAtUtc).toBeTruthy();
-    expect(list).toHaveBeenCalledTimes(8);
+    expect(list).toHaveBeenCalledTimes(16);
   });
 
   it("fails without returning partial data after repeated changes", async () => {

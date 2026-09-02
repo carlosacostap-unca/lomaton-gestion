@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
+import type { ParticipantRole } from "@/lib/auth/bootstrap-policy";
 
 async function bootstrapSession() {
   const pb = getBrowserPocketBase();
@@ -24,13 +25,15 @@ async function bootstrapSession() {
     pb.authStore.clear();
     throw new Error("La identidad no está habilitada para este hackatón.");
   }
+  const payload = await response.json() as { user: Record<string, unknown>; participantRole: ParticipantRole };
   await pb.collection("users").authRefresh();
-  return pb.authStore.record;
+  return { user: pb.authStore.record, participantRole: payload.participantRole };
 }
 
 type AuthContextValue = {
   user: RecordModel | null;
   loading: boolean;
+  participantRole: ParticipantRole | null;
   loginWithGoogle: () => Promise<void>;
   logout: () => void;
 };
@@ -40,6 +43,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<RecordModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [participantRole, setParticipantRole] = useState<ParticipantRole | null>(null);
 
   useEffect(() => {
     const pb = getBrowserPocketBase();
@@ -50,7 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = pb.authStore.onChange(update);
     void (async () => {
       try {
-        if (pb.authStore.isValid) await bootstrapSession();
+        if (pb.authStore.isValid) {
+          const session = await bootstrapSession();
+          setParticipantRole(session.participantRole);
+        }
         else update();
       } catch {
         pb.authStore.clear();
@@ -72,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           else window.location.href = url;
         },
       });
-      await bootstrapSession();
+      const session = await bootstrapSession();
+      setParticipantRole(session.participantRole);
       popup?.close();
     } catch (error) {
       popup?.close();
@@ -83,11 +91,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     getBrowserPocketBase().authStore.clear();
+    setParticipantRole(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, loginWithGoogle, logout }),
-    [user, loading, loginWithGoogle, logout],
+    () => ({ user, loading, participantRole, loginWithGoogle, logout }),
+    [user, loading, participantRole, loginWithGoogle, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

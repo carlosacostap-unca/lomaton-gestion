@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { confirmRegistrationImport } from "@/lib/import/confirm-registrations";
+import { confirmRegistrationImport, preserveSelfManagedRegistrationFields } from "@/lib/import/confirm-registrations";
 import { parseRegistrationFile } from "@/lib/import/registrations";
 import type { LomatonUser } from "@/lib/pocketbase/server";
 import { registrationCsv, registrationRow } from "@/tests/fixtures/registration-form";
@@ -46,6 +46,17 @@ const admin = {
   enabled: true,
   isAdmin: true,
 } as LomatonUser;
+
+describe("self-managed registration fields", () => {
+  it("preserves participant edits and reports import differences", () => {
+    const result = preserveSelfManagedRegistrationFields(
+      { phone: "+54 383 444", department: "Autogestionado", profileVersion: 3, selfManagedFields: ["phone", "department"], selfEditedAt: "2026-09-01T10:00:00Z" },
+      { phone: "383000", department: "Importado", academicUnit: "FACEN" },
+    );
+    expect(result.next).toMatchObject({ phone: "+54 383 444", department: "Autogestionado", academicUnit: "FACEN", profileVersion: 3, selfManagedFields: ["phone", "department"] });
+    expect(result.differences).toEqual(["phone", "department"]);
+  });
+});
 
 async function validRows() {
   const csv = registrationCsv([

@@ -49,7 +49,7 @@ export default function AdminPage() {
     <main className="app-shell">
       <header className="app-header">
         <div><p className="eyebrow">Administración</p><h1>Padrón de candidatos</h1></div>
-        <div className="header-actions"><Link className="secondary-button link-button" href="/">Inicio</Link><button className="secondary-button" onClick={logout}>Cerrar sesión</button></div>
+        <div className="header-actions">{user.registration ? <Link className="secondary-button link-button" href="/portal">Mi portal</Link> : <Link className="secondary-button link-button" href="/">Inicio</Link>}<button className="secondary-button" onClick={logout}>Cerrar sesión</button></div>
       </header>
 
       <AdminOverview />

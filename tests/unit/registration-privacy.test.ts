@@ -36,7 +36,7 @@ describe("registration privacy schema", () => {
       expect(rules.listRule).toContain(technicalRule);
       expect(rules.viewRule).toBe(rules.listRule);
       expect(rules.createRule).toBe(technicalRule);
-      expect(rules.updateRule).toBe(technicalRule);
+      expect(rules.updateRule).toContain(technicalRule);
       expect(rules.deleteRule).toBeNull();
     }
   });

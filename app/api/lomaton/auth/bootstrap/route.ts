@@ -19,15 +19,28 @@ export async function POST(request: Request) {
       email,
     });
 
-    const [candidates, admins] = await Promise.all([
+    const [candidates, registrations, admins] = await Promise.all([
       pb.collection("candidates").getList(1, 1, { filter }),
+      pb.collection("registrations").getList(1, 1, {
+        filter: pb.filter("emailNormalized = {:email}", { email }),
+      }),
       pb.collection("admin_allowlist").getList(1, 1, { filter }),
     ]);
+    const registration = registrations.items[0] ?? null;
+    const mentors = registration
+      ? await pb.collection("mentor_profiles").getList(1, 1, {
+          filter: pb.filter("registration = {:registration} && active = true", {
+            registration: registration.id,
+          }),
+        })
+      : { items: [] };
     const access = evaluateBootstrapAccess({
       email,
       verified: user.verified,
       currentDisplayName: user.displayName || user.name,
       candidate: candidates.items[0] as never,
+      registration: registration as never,
+      mentor: mentors.items[0] as never,
       admin: admins.items[0] as never,
     });
 
@@ -41,11 +54,13 @@ export async function POST(request: Request) {
 
     const updated = await pb.collection("users").update(user.id, access.patch);
     return Response.json({
+      participantRole: access.participantRole,
       user: {
         id: updated.id,
         email: updated.email,
         displayName: updated.displayName,
         candidate: updated.candidate,
+        registration: updated.registration,
         isAdmin: updated.isAdmin,
         enabled: updated.enabled,
       },

@@ -22,6 +22,7 @@ type Preview = {
     sourceRows: number[];
     changedFields: string[];
   }>;
+  selfManagedDifferences: Array<{ rowNumber: number; registrationId: string; fields: string[] }>;
   summary: {
     total: number;
     valid: number;
@@ -188,6 +189,11 @@ export function RegistrationImporter() {
           {dirty ? (
             <div className="alert" role="status">
               Hay correcciones sin revalidar.
+            </div>
+          ) : null}
+          {preview.selfManagedDifferences.length ? (
+            <div className="alert" role="status">
+              Se preservarán cambios realizados por participantes en {preview.selfManagedDifferences.length} fila(s): {preview.selfManagedDifferences.map((item) => `fila ${item.rowNumber} (${item.fields.join(", ")})`).join("; ")}.
             </div>
           ) : null}
 

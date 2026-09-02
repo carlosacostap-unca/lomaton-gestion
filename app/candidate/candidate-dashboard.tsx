@@ -7,6 +7,7 @@ import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
 import { StudentCertificateCard } from "./student-certificate-card";
+import { TeamMentorCard } from "@/app/portal/team-mentor-card";
 
 type CandidateState = {
   settings: RecordModel;
@@ -147,6 +148,7 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
           </section>
 
           {state.team.owner === candidateId ? (
+            <>
             <section className="panel">
               <h2>Gestionar invitaciones</h2>
               <form action={(formData) => command(`/api/lomaton/teams/${state.team?.id}/invitations`, "POST", { candidateId: formData.get("candidateId") }, "Invitación enviada.")} className="search-form">
@@ -157,6 +159,8 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
               {state.teamInvitations.map((invitation) => <div className="invitation-card" key={invitation.id}><span>{candidateName(invitation.expand?.candidate)}</span><button className="text-button" disabled={busy || !formationOpen} onClick={() => command(`/api/lomaton/invitations/${invitation.id}`, "DELETE", undefined, "Invitación retirada.")}>Retirar</button></div>)}
               <button className="danger-button" disabled={busy || !formationOpen} onClick={() => { if (window.confirm("¿Disolver el equipo y liberar a todos sus miembros?")) void command(`/api/lomaton/teams/${state.team?.id}`, "DELETE", undefined, "Equipo disuelto."); }}>Disolver equipo</button>
             </section>
+            <TeamMentorCard teamId={state.team.id} formationOpen={formationOpen} />
+            </>
           ) : <section className="panel"><p className="muted">Sólo el responsable puede invitar o disolver. Los miembros aceptados no pueden ser expulsados sin intervención administrativa.</p></section>}
         </>
       )}

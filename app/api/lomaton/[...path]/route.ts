@@ -19,6 +19,17 @@ import {
   withdrawInvitation,
 } from "@/lib/domain/team-commands";
 import {
+  getOwnMentorDashboard,
+  getTeamMentorState,
+  inviteMentor,
+  listEligibleMentors,
+  resolveMentorInvitation,
+  resolveAdminMentorInvitation,
+  removeAdminMentorship,
+  withdrawMentorInvitation,
+} from "@/lib/domain/mentor-commands";
+import { getOwnProfile, updateOwnProfile } from "@/lib/domain/participant-profile";
+import {
   listAdminRegistrations,
   updateAdminRegistration,
 } from "@/lib/domain/registration-admin";
@@ -82,6 +93,16 @@ const registrationUpdateSchema = z.object({
   active: z.boolean(),
   reason: z.string().max(1000).default(""),
 });
+const profileUpdateSchema = z.object({
+  expectedVersion: z.number().int().min(0),
+  phone: z.string().trim().min(5).max(80).optional(),
+  department: z.string().trim().max(240).optional(),
+  academicUnit: z.string().trim().max(240).optional(),
+  career: z.string().trim().max(240).optional(),
+  externalTeacherDescription: z.string().trim().max(2000).optional(),
+  mentorInterest: z.enum(["yes", "no", "not_provided"]).optional(),
+}).strict();
+const mentorInvitationSchema = z.object({ mentorId: z.string().min(1) }).strict();
 
 async function body(request: Request) {
   try {
@@ -106,14 +127,26 @@ async function adminContext(request: Request) {
 export async function GET(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
-    const { pb } = await adminContext(request);
-    if (path.length === 2 && path[0] === "admin" && path[1] === "report-snapshot") {
-      return Response.json(await readConsistentReportSnapshot(pb));
+    if (path[0] === "admin") {
+      const { pb } = await adminContext(request);
+      if (path.length === 2 && path[1] === "report-snapshot") {
+        return Response.json(await readConsistentReportSnapshot(pb));
+      }
+      if (path.length === 2 && path[1] === "registrations") {
+        const query = new URL(request.url).searchParams.get("query") ?? "";
+        return Response.json(await listAdminRegistrations(pb, query));
+      }
+      throw new ApiError(404, "La operación no existe.", "route_not_found");
     }
-    if (path.length === 2 && path[0] === "admin" && path[1] === "registrations") {
-      const query = new URL(request.url).searchParams.get("query") ?? "";
-      return Response.json(await listAdminRegistrations(pb, query));
+    const { user, pb } = await context(request);
+    if (path.length === 2 && path[0] === "me" && path[1] === "profile") return Response.json(await getOwnProfile(pb, user));
+    if (path.length === 2 && path[0] === "me" && path[1] === "mentor") return Response.json(await getOwnMentorDashboard(pb, user));
+    if (path.length === 2 && path[0] === "mentors" && path[1] === "eligible") {
+      const teamId = new URL(request.url).searchParams.get("teamId") ?? "";
+      if (!teamId) throw new ApiError(400, "Falta el equipo.", "team_required");
+      return Response.json(await listEligibleMentors(pb, user, teamId));
     }
+    if (path.length === 3 && path[0] === "teams" && path[2] === "mentor") return Response.json(await getTeamMentorState(pb, user, path[1]));
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
     return errorResponse(error);
@@ -123,6 +156,10 @@ export async function GET(request: Request, routeContext: Context) {
 export async function PATCH(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
+    if (path.length === 2 && path[0] === "me" && path[1] === "profile") {
+      const { user, pb } = await context(request);
+      return Response.json(await updateOwnProfile(pb, user, profileUpdateSchema.parse(await body(request))));
+    }
     const { user, pb } = await adminContext(request);
     if (path.length === 2 && path[0] === "admin" && path[1] === "settings") {
       const input = settingsSchema.parse(await body(request));
@@ -168,6 +205,10 @@ export async function POST(request: Request, routeContext: Context) {
           await resolveAdminInvitation(pb, user, path[2], input.resolution, input.reason),
         );
       }
+      if (path.length === 4 && path[1] === "mentor-invitations" && path[3] === "resolve") {
+        const input = reasonSchema.parse(await body(request));
+        return Response.json(await resolveAdminMentorInvitation(pb, user, path[2], input.reason));
+      }
       throw new ApiError(404, "La operación no existe.", "route_not_found");
     }
     const { user, pb } = await context(request);
@@ -185,6 +226,16 @@ export async function POST(request: Request, routeContext: Context) {
     }
     if (path.length === 3 && path[0] === "invitations" && path[2] === "reject") {
       return Response.json(await resolveOwnInvitation(pb, user, path[1], "rejected"));
+    }
+    if (path.length === 3 && path[0] === "teams" && path[2] === "mentor-invitations") {
+      const input = mentorInvitationSchema.parse(await body(request));
+      return Response.json(await inviteMentor(pb, user, path[1], input.mentorId), { status: 201 });
+    }
+    if (path.length === 3 && path[0] === "mentor-invitations" && path[2] === "accept") {
+      return Response.json(await resolveMentorInvitation(pb, user, path[1], "accepted"));
+    }
+    if (path.length === 3 && path[0] === "mentor-invitations" && path[2] === "reject") {
+      return Response.json(await resolveMentorInvitation(pb, user, path[1], "rejected"));
     }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
@@ -235,6 +286,10 @@ export async function DELETE(request: Request, routeContext: Context) {
           await removeAdminTeamMember(pb, user, path[2], path[4], input.reason),
         );
       }
+      if (path.length === 3 && path[1] === "team-mentorships") {
+        const input = reasonSchema.parse(await body(request));
+        return Response.json(await removeAdminMentorship(pb, user, path[2], input.reason));
+      }
       throw new ApiError(404, "La operación no existe.", "route_not_found");
     }
     const { user, pb } = await context(request);
@@ -244,6 +299,9 @@ export async function DELETE(request: Request, routeContext: Context) {
     }
     if (path.length === 2 && path[0] === "invitations") {
       return Response.json(await withdrawInvitation(pb, user, path[1]));
+    }
+    if (path.length === 2 && path[0] === "mentor-invitations") {
+      return Response.json(await withdrawMentorInvitation(pb, user, path[1]));
     }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {

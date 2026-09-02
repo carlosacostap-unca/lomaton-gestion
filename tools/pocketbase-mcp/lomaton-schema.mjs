@@ -1,8 +1,17 @@
 export const technicalRule =
   '@request.auth.active = true && @request.auth.role = "lomaton_server"';
 
+export const participantSelfManagedFields = [
+  "phone",
+  "department",
+  "academicUnit",
+  "career",
+  "externalTeacherDescription",
+  "mentorInterest",
+];
+
 export const expectedFields = {
-  users: ["candidate", "displayName", "isAdmin", "enabled"],
+  users: ["candidate", "registration", "displayName", "isAdmin", "enabled"],
   service_accounts: ["active", "role"],
   registrations: [
     "submittedAt", "fullName", "dni", "dniNormalized", "phone", "phoneNormalized",
@@ -10,6 +19,7 @@ export const expectedFields = {
     "academicUnit", "career", "externalTeacherDescription", "mentorInterest",
     "declaredTeamStatus", "declaredTeamMembers", "termsAccepted", "mediaAuthorized",
     "sourceRole", "sourceRowNumber", "rawSource", "reviewStatus", "importBatch",
+    "profileVersion", "selfManagedFields", "selfEditedAt",
   ],
   candidates: ["registration", "fullName", "firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
   student_certificates: [
@@ -21,6 +31,8 @@ export const expectedFields = {
   teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
   team_memberships: ["team", "candidate", "source"],
   team_invitations: ["team", "candidate", "invitedBy", "status", "resolvedAt"],
+  mentor_invitations: ["team", "mentor", "invitedBy", "status", "resolvedAt", "created", "updated"],
+  team_mentorships: ["team", "mentor", "source", "created", "updated"],
   hackathon_settings: ["key", "deadlineUtc", "timezone", "formationOpen", "dataVersion"],
   import_batches: ["fileName", "fileType", "totalRows", "validRows", "invalidRows", "pendingFtcaRows", "createdBy"],
   audit_logs: ["actor", "action", "entityType", "entityId", "before", "after", "reason", "metadata"],
@@ -43,7 +55,7 @@ export const collectionRulePatches = {
     deleteRule: null,
     manageRule: null,
     authRule:
-      'verified = true && ((@collection.candidates.emailNormalized ?= email && @collection.candidates.active ?= true) || (@collection.admin_allowlist.emailNormalized ?= email && @collection.admin_allowlist.active ?= true))',
+      'verified = true && ((@collection.candidates.emailNormalized ?= email && @collection.candidates.active ?= true) || (@collection.mentor_profiles.registration.emailNormalized ?= email && @collection.mentor_profiles.registration.relationship ?= "teacher" && @collection.mentor_profiles.active ?= true) || (@collection.admin_allowlist.emailNormalized ?= email && @collection.admin_allowlist.active ?= true))',
   },
   service_accounts: {
     listRule: null,
@@ -58,7 +70,7 @@ export const collectionRulePatches = {
     listRule: adminOrTechnicalRule,
     viewRule: adminOrTechnicalRule,
     createRule: technicalRule,
-    updateRule: technicalRule,
+    updateRule: `${technicalRule} && (@request.query.expected_profile_version = "" || profileVersion = @request.query.expected_profile_version)`,
     deleteRule: null,
   },
   candidates: {
@@ -106,6 +118,20 @@ export const collectionRulePatches = {
   team_invitations: {
     listRule: invitationReadRule,
     viewRule: invitationReadRule,
+    createRule: technicalRule,
+    updateRule: technicalRule,
+    deleteRule: technicalRule,
+  },
+  mentor_invitations: {
+    listRule: adminOrTechnicalRule,
+    viewRule: adminOrTechnicalRule,
+    createRule: technicalRule,
+    updateRule: technicalRule,
+    deleteRule: technicalRule,
+  },
+  team_mentorships: {
+    listRule: adminOrTechnicalRule,
+    viewRule: adminOrTechnicalRule,
     createRule: technicalRule,
     updateRule: technicalRule,
     deleteRule: technicalRule,
@@ -160,6 +186,31 @@ export const dataVersionField = {
   min: 0,
   onlyInt: true,
 };
+
+export function participantUserFields(registrationsCollectionId) {
+  return [{
+    name: "registration",
+    type: "relation",
+    required: false,
+    collectionId: registrationsCollectionId,
+    maxSelect: 1,
+    cascadeDelete: false,
+  }];
+}
+
+export function participantProfileFields() {
+  return [
+    { name: "profileVersion", type: "number", required: false, min: 0, onlyInt: true },
+    {
+      name: "selfManagedFields",
+      type: "select",
+      required: false,
+      maxSelect: participantSelfManagedFields.length,
+      values: participantSelfManagedFields,
+    },
+    { name: "selfEditedAt", type: "date", required: false },
+  ];
+}
 
 const triStateValues = ["yes", "no", "not_provided"];
 
@@ -224,6 +275,7 @@ export function registrationsCollection(importBatchesCollectionId) {
         maxSelect: 1,
         cascadeDelete: false,
       },
+      ...participantProfileFields(),
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_registrations_email_normalized ON registrations (emailNormalized)",
@@ -254,6 +306,47 @@ export function mentorProfilesCollection(registrationsCollectionId) {
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_mentor_profiles_registration ON mentor_profiles (registration)",
+    ],
+  };
+}
+
+export function mentorInvitationsCollection(teamsCollectionId, mentorsCollectionId, usersCollectionId) {
+  return {
+    name: "mentor_invitations",
+    type: "base",
+    ...collectionRulePatches.mentor_invitations,
+    fields: [
+      { name: "team", type: "relation", required: true, collectionId: teamsCollectionId, maxSelect: 1, cascadeDelete: true },
+      { name: "mentor", type: "relation", required: true, collectionId: mentorsCollectionId, maxSelect: 1, cascadeDelete: false },
+      { name: "invitedBy", type: "relation", required: true, collectionId: usersCollectionId, maxSelect: 1, cascadeDelete: false },
+      { name: "status", type: "select", required: true, maxSelect: 1, values: ["pending", "accepted", "rejected", "withdrawn", "cancelled"] },
+      { name: "resolvedAt", type: "date", required: false },
+      { name: "created", type: "autodate", onCreate: true, onUpdate: false },
+      { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_mentor_invitations_pending_pair ON mentor_invitations (team, mentor) WHERE status = 'pending'",
+      "CREATE INDEX idx_mentor_invitations_team_status ON mentor_invitations (team, status)",
+      "CREATE INDEX idx_mentor_invitations_mentor_status ON mentor_invitations (mentor, status)",
+    ],
+  };
+}
+
+export function teamMentorshipsCollection(teamsCollectionId, mentorsCollectionId) {
+  return {
+    name: "team_mentorships",
+    type: "base",
+    ...collectionRulePatches.team_mentorships,
+    fields: [
+      { name: "team", type: "relation", required: true, collectionId: teamsCollectionId, maxSelect: 1, cascadeDelete: true },
+      { name: "mentor", type: "relation", required: true, collectionId: mentorsCollectionId, maxSelect: 1, cascadeDelete: false },
+      { name: "source", type: "select", required: true, maxSelect: 1, values: ["invitation", "admin"] },
+      { name: "created", type: "autodate", onCreate: true, onUpdate: false },
+      { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_team_mentorships_team ON team_mentorships (team)",
+      "CREATE UNIQUE INDEX idx_team_mentorships_mentor ON team_mentorships (mentor)",
     ],
   };
 }

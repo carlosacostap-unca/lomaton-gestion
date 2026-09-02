@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import PocketBase, { ClientResponseError, type RecordModel } from "pocketbase";
 
 import { normalizeTeamName, projectTeam } from "@/lib/domain/team-rules";
+import { addAudit } from "@/lib/domain/admin-commands";
 import type { LomatonUser } from "@/lib/pocketbase/server";
 import { ApiError } from "@/lib/server/api-error";
 
@@ -168,7 +169,19 @@ export async function disbandOwnTeam(pb: PocketBase, user: LomatonUser, teamId: 
   if (team.owner !== candidateId) {
     throw new ApiError(403, "Solamente el responsable puede disolver el equipo.", "owner_required");
   }
+  const [mentorInvitations, mentorships] = await Promise.all([
+    pb.collection("mentor_invitations").getFullList({ filter: pb.filter("team = {:team}", { team: team.id }) }),
+    pb.collection("team_mentorships").getFullList({ filter: pb.filter("team = {:team}", { team: team.id }) }),
+  ]);
   const batch = pb.createBatch();
+  addAudit(batch, {
+    actorId: user.id,
+    action: "team.disband",
+    entityType: "teams",
+    entityId: team.id,
+    before: { team, mentorInvitationIds: mentorInvitations.map((item) => item.id), mentorshipIds: mentorships.map((item) => item.id) },
+    after: null,
+  });
   batch.collection("teams").delete(team.id);
   updateVersion(batch, currentSettings.id);
   await sendBatch(batch);

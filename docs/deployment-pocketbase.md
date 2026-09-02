@@ -38,9 +38,11 @@ El MCP está bloqueado a HTTPS y al host productivo. Por decisión operativa exp
 2. revisar `tools/pocketbase-mcp/lomaton-schema.mjs`;
 3. comprobar que `POCKETBASE_ALLOW_WRITES=true` y `POCKETBASE_ALLOW_DELETES=true`;
 4. ejecutar `apply_lomaton_schema`;
-5. ejecutar `ensure_service_account` sólo si se crea o sincroniza la identidad técnica;
-6. ejecutar `validate_hackathon_schema` y `get_batch_settings`;
-7. revisar los objetivos exactos antes de cualquier eliminación, ya que el MCP conserva ese permiso.
+5. para el portal por rol, ejecutar `backfill_participant_profiles` dos veces y comprobar que la segunda informa `updated=0`;
+6. ejecutar `ensure_service_account` sólo si se crea o sincroniza la identidad técnica;
+7. ejecutar `validate_hackathon_schema` y `get_batch_settings`;
+8. revisar reglas e índices de `users`, `registrations`, `mentor_invitations` y `team_mentorships` antes de desplegar Next.js;
+9. revisar los objetivos exactos antes de cualquier eliminación, ya que el MCP conserva ese permiso.
 
 Para habilitar certificados, `apply_lomaton_schema` crea aditivamente `student_certificates` con un único registro por candidato, PDF protegido de hasta 10 MiB y reglas exclusivas para `lomaton_server`. Después se debe comprobar que el acceso anónimo y los tokens humanos de candidato o administrador reciben denegación al intentar acceder directamente a registros o archivos. Los flujos válidos pasan siempre por los Route Handlers de Next.js.
 
@@ -49,6 +51,10 @@ La revisión agrega aditivamente `reviewStatus` (`pending`, `approved`, `rejecte
 Monitorear errores `invalid_certificate_review_status`, `certificate_review_conflict` y fallos de Batch. Un 409 es recuperable: el administrador debe releer el PDF vigente. La cola pendiente incluye temporalmente estados vacíos hasta completar el backfill. No usar FTCA, membresías ni equipos para derivar o almacenar decisiones documentales.
 
 La aplicación idempotente crea o actualiza solamente elementos conocidos. No elimina colecciones, campos ni registros. Batch está configurado con 11.000 solicitudes, 60 segundos y 16 MiB para cubrir una importación máxima y sus proyecciones.
+
+El rollout del portal debe mantener este orden: backup; esquema aditivo; backfill de versiones y vínculos; segunda ejecución idempotente; validación estricta; pruebas de privacidad con token humano; y sólo entonces despliegue de Next.js. La versión anterior de la aplicación ignora los campos y colecciones nuevas. No desplegar las rutas nuevas antes del esquema porque el bootstrap docente depende de `users.registration` y `mentor_profiles`.
+
+La aceptación del portal usa datos ficticios identificables: un estudiante, un docente disponible, dos equipos responsables y un administrador. Verificar que ambos equipos pueden invitar al docente, que sólo una aceptación crea mentoría, que las invitaciones incompatibles se cancelan, que los contadores y FTCA no cambian, que la disolución libera al mentor y que los CSV/XLSX muestran la mentoría en columnas separadas. Eliminar sólo los registros E2E creados y repetir los conteos de línea base.
 
 ## Google OAuth2
 

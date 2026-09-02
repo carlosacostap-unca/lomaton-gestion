@@ -12,6 +12,9 @@ const snapshot: ReportSnapshot = {
   ],
   memberships: [{ id: "m1", candidate: "c1", team: "t1" }],
   invitations: [{ id: "i1", status: "pending" }, { id: "i2", status: "rejected" }],
+  mentors: [],
+  mentorInvitations: [],
+  mentorships: [],
 };
 
 describe("hackathon report summary", () => {
