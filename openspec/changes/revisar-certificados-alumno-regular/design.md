@@ -24,7 +24,7 @@ El estado FTCA pertenece al padrón de candidatos y participa en la proyección 
 
 ### 1. Estado y metadatos de revisión en el registro vigente
 
-`student_certificates` incorporará `reviewStatus` con valores `pending`, `approved` y `rejected`, además de `reviewedBy`, `reviewedAt` y `rejectionReason`. Los tres últimos estarán vacíos en `pending`; `rejectionReason` será obligatorio sólo para `rejected` y se vaciará al aprobar.
+`student_certificates` incorporará `reviewStatus` con valores `pending`, `approved` y `rejected`, además de `reviewedBy`, `reviewedAt` y `rejectionReason`. Los tres últimos estarán vacíos en `pending`; `rejectionReason` será obligatorio sólo para `rejected` y se vaciará al aprobar. El contrato declara explícitamente los `autodate` `created` y `updated`, necesarios para mostrar la fecha de carga y ordenar la cola de forma estable en PocketBase 0.40.
 
 La colección seguirá teniendo un único registro por candidato. Mantener la decisión junto al archivo evita una segunda colección con cardinalidad e integridad adicionales y expresa que sólo importa el resultado sobre la versión vigente. La auditoría conservará las transiciones históricas no sensibles.
 

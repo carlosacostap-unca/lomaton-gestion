@@ -14,7 +14,7 @@ export const expectedFields = {
   candidates: ["registration", "fullName", "firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
   student_certificates: [
     "candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy",
-    "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason",
+    "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason", "created", "updated",
   ],
   mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
@@ -303,6 +303,13 @@ export function studentCertificateReviewFields(usersCollectionId) {
   ];
 }
 
+export function studentCertificateTimestampFields() {
+  return [
+    { name: "created", type: "autodate", onCreate: true, onUpdate: false },
+    { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+  ];
+}
+
 export function planStudentCertificateReviewBackfill(records) {
   const invalid = [];
   const updates = [];
@@ -360,6 +367,7 @@ export function studentCertificatesCollection(candidatesCollectionId, usersColle
         cascadeDelete: false,
       },
       ...studentCertificateReviewFields(usersCollectionId),
+      ...studentCertificateTimestampFields(),
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_student_certificates_candidate ON student_certificates (candidate)",

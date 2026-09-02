@@ -18,6 +18,7 @@ import {
   serviceAccountsCollection,
   studentCertificatesCollection,
   studentCertificateReviewFields,
+  studentCertificateTimestampFields,
 } from "./lomaton-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -258,7 +259,10 @@ const handlers = {
     }
     const certificateFields = [...(certificates.fields || [])];
     let certificateSchemaChanged = false;
-    for (const field of studentCertificateReviewFields(certificateUsers.id)) {
+    for (const field of [
+      ...studentCertificateReviewFields(certificateUsers.id),
+      ...studentCertificateTimestampFields(),
+    ]) {
       if (!certificateFields.some((current) => current.name === field.name)) {
         certificateFields.push(field);
         certificateSchemaChanged = true;

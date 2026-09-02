@@ -24,10 +24,12 @@ Las escrituras de dominio aceptan exclusivamente `active=true && role="lomaton_s
 
 Los índices únicos cubren email y DNI normalizados de inscripción, relación inscripción/candidato, relación inscripción/mentor, email de candidato, email administrativo, candidato vinculado a usuario, nombre de equipo, una membresía por candidato, par equipo/candidato e invitación pendiente por equipo/candidato. Las relaciones desde membresías e invitaciones al equipo tienen `cascadeDelete=true`.
 
-`student_certificates` mantiene unicidad por candidato e índice por `reviewStatus`. Los estados permitidos son `pending`, `approved` y `rejected`; la relación opcional `reviewedBy` apunta a `users`, `reviewedAt` registra la decisión y `rejectionReason` se limita a 1.000 caracteres. El reemplazo del archivo limpia esos tres metadatos y vuelve a `pending`.
+`student_certificates` mantiene unicidad por candidato e índice por `reviewStatus`. Los estados permitidos son `pending`, `approved` y `rejected`; la relación opcional `reviewedBy` apunta a `users`, `reviewedAt` registra la decisión y `rejectionReason` se limita a 1.000 caracteres. `created` y `updated` son campos `autodate` explícitos porque PocketBase 0.40 no los agrega implícitamente a colecciones nuevas. El reemplazo del archivo limpia esos tres metadatos y vuelve a `pending`.
 
 El máximo de cuatro se protege con una actualización condicional del contador en cada Batch. La proyección queda en `draft`, `missing_ftca`, `complete` o `invalid` según membresías y FTCA.
 
 ## Estado aplicado
 
 El 1 de septiembre de 2026 el MCP aplicó y validó las doce colecciones y todos los campos esperados. Creó `registrations` y `mentor_profiles`, agregó la proyección privada a `candidates` y reaplicó reglas e índices sin eliminar datos. La consulta anónima de `registrations` devolvió un conjunto vacío, comportamiento con el que PocketBase oculta registros cuando la regla de listado no se cumple; las reglas persistidas limitan lectura a administradores o a la cuenta técnica. API Batch continúa habilitada.
+
+El 2 de septiembre de 2026 se aplicaron los campos e índice de revisión, el backfill informó cero certificados existentes y su segunda ejecución confirmó idempotencia. La aceptación detectó y corrigió aditivamente la ausencia de `created`/`updated` en la colección documental; después cubrió el ciclo completo con un PDF ficticio y restauró la línea base sin residuos E2E.

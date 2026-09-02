@@ -19,7 +19,7 @@ describe("student certificate PocketBase schema", () => {
     const file = collection.fields.find((field) => field.name === "certificate");
     expect(expectedFields.student_certificates).toEqual([
       "candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy",
-      "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason",
+      "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason", "created", "updated",
     ]);
     expect(file).toMatchObject({
       type: "file",
@@ -45,6 +45,12 @@ describe("student certificate PocketBase schema", () => {
     expect(collection.fields.find((field) => field.name === "rejectionReason")).toMatchObject({
       type: "text",
       max: certificateRejectionReasonMaxLength,
+    });
+    expect(collection.fields.find((field) => field.name === "created")).toMatchObject({
+      type: "autodate", onCreate: true, onUpdate: false,
+    });
+    expect(collection.fields.find((field) => field.name === "updated")).toMatchObject({
+      type: "autodate", onCreate: true, onUpdate: true,
     });
   });
 
