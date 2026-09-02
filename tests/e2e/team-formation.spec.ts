@@ -88,19 +88,21 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await owner.goto("/candidate");
   await owner.getByLabel("Nombre del equipo").fill(teamName);
   await owner.getByRole("button", { name: "Crear equipo" }).click();
-  await expect(owner.getByRole("status")).toContainText("Equipo creado");
+  await expect(owner.getByText("Equipo creado.")).toBeVisible();
 
   for (const invited of users.slice(1)) {
-    await owner.getByLabel("Candidato disponible").selectOption(invited.candidateId);
+    await owner.getByLabel("Buscar estudiante").fill(invited.email);
+    await expect(owner.getByText("1 estudiante disponible.")).toBeVisible();
+    await owner.getByLabel("Estudiante disponible").selectOption(invited.candidateId);
     await owner.getByRole("button", { name: "Invitar" }).click();
-    await expect(owner.getByRole("status")).toContainText("Invitación enviada");
+    await expect(owner.getByText("Invitación enviada.")).toBeVisible();
     const invitedContext = await browser.newContext();
     await authenticate(invitedContext, { token: invited.token, record: invited.record });
     const invitedPage = await invitedContext.newPage();
     await invitedPage.goto("/candidate");
     await expect(invitedPage.getByText(teamName)).toBeVisible();
     await invitedPage.getByRole("button", { name: "Aceptar" }).click();
-    await expect(invitedPage.getByRole("status")).toContainText("Te incorporaste");
+    await expect(invitedPage.getByText("Te incorporaste al equipo.")).toBeVisible();
     await invitedContext.close();
     await owner.reload();
   }
@@ -113,6 +115,9 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   });
   expect(duplicate.status()).toBe(409);
   await owner.setViewportSize({ width: 390, height: 844 });
+  await expect(owner.getByLabel("Buscar estudiante")).toBeVisible();
+  await owner.getByLabel("Buscar estudiante").focus();
+  await expect(owner.getByLabel("Buscar estudiante")).toBeFocused();
   expect(await owner.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
   const adminContext = await browser.newContext({ viewport: { width: 390, height: 844 } });

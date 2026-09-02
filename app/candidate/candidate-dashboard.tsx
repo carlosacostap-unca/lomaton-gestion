@@ -1,11 +1,12 @@
 "use client";
 
 import type { RecordModel } from "pocketbase";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
+import { filterCandidateInviteOptions } from "@/lib/ui/invite-option-filter";
 import { StudentCertificateCard } from "./student-certificate-card";
 import { TeamMentorCard } from "@/app/portal/team-mentor-card";
 
@@ -74,6 +75,13 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
   const [state, setState] = useState<CandidateState | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidateInviteId, setCandidateInviteId] = useState("");
+
+  const filteredCandidates = useMemo(
+    () => filterCandidateInviteOptions(state?.availableCandidates ?? [], candidateQuery),
+    [candidateQuery, state?.availableCandidates],
+  );
 
   useEffect(() => {
     let active = true;
@@ -85,7 +93,19 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
 
   async function refresh(success = "") {
     setState(await loadState(candidateId));
+    setCandidateInviteId("");
     setMessage(success);
+  }
+
+  function updateCandidateQuery(query: string) {
+    setCandidateQuery(query);
+    if (
+      candidateInviteId &&
+      !filterCandidateInviteOptions(state?.availableCandidates ?? [], query)
+        .some((candidate) => candidate.id === candidateInviteId)
+    ) {
+      setCandidateInviteId("");
+    }
   }
 
   async function command(path: string, method: string, body?: unknown, success = "Operación realizada.") {
@@ -151,10 +171,43 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
             <>
             <section className="panel">
               <h2>Gestionar invitaciones</h2>
-              <form action={(formData) => command(`/api/lomaton/teams/${state.team?.id}/invitations`, "POST", { candidateId: formData.get("candidateId") }, "Invitación enviada.")} className="search-form">
-                <label htmlFor="invite-candidate">Candidato disponible</label>
-                <select id="invite-candidate" name="candidateId" required><option value="">Seleccionar…</option>{state.availableCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidateName(candidate)} · {candidate.email}</option>)}</select>
-                <button className="primary-button" disabled={busy || !formationOpen || state.members.length >= 4}>Invitar</button>
+              <form action={() => {
+                if (candidateInviteId) {
+                  return command(`/api/lomaton/teams/${state.team?.id}/invitations`, "POST", { candidateId: candidateInviteId }, "Invitación enviada.");
+                }
+              }} className="search-form">
+                <div className="search-field">
+                  <label htmlFor="invite-candidate-search">Buscar estudiante</label>
+                  <input
+                    id="invite-candidate-search"
+                    type="search"
+                    value={candidateQuery}
+                    onChange={(event) => updateCandidateQuery(event.target.value)}
+                    placeholder="Nombre o correo"
+                    aria-controls="invite-candidate"
+                    aria-describedby="invite-candidate-results"
+                  />
+                </div>
+                <p id="invite-candidate-results" className="search-results muted" role="status" aria-live="polite">
+                  {filteredCandidates.length
+                    ? `${filteredCandidates.length} ${filteredCandidates.length === 1 ? "estudiante disponible" : "estudiantes disponibles"}.`
+                    : "No hay estudiantes que coincidan con la búsqueda."}
+                </p>
+                <div className="select-field">
+                  <label htmlFor="invite-candidate">Estudiante disponible</label>
+                  <select
+                    id="invite-candidate"
+                    name="candidateId"
+                    value={candidateInviteId}
+                    required
+                    disabled={!filteredCandidates.length}
+                    onChange={(event) => setCandidateInviteId(event.target.value)}
+                  >
+                    <option value="">{filteredCandidates.length ? "Seleccionar…" : "Sin coincidencias"}</option>
+                    {filteredCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidateName(candidate)} · {candidate.email}</option>)}
+                  </select>
+                </div>
+                <button className="primary-button" disabled={busy || !formationOpen || state.members.length >= 4 || !candidateInviteId}>Invitar</button>
               </form>
               {state.teamInvitations.map((invitation) => <div className="invitation-card" key={invitation.id}><span>{candidateName(invitation.expand?.candidate)}</span><button className="text-button" disabled={busy || !formationOpen} onClick={() => command(`/api/lomaton/invitations/${invitation.id}`, "DELETE", undefined, "Invitación retirada.")}>Retirar</button></div>)}
               <button className="danger-button" disabled={busy || !formationOpen} onClick={() => { if (window.confirm("¿Disolver el equipo y liberar a todos sus miembros?")) void command(`/api/lomaton/teams/${state.team?.id}`, "DELETE", undefined, "Equipo disuelto."); }}>Disolver equipo</button>
