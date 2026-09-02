@@ -26,7 +26,7 @@ describe("StudentCertificateCard", () => {
 
   it("presents an accessible empty state and accepts only PDF selection", async () => {
     render(<StudentCertificateCard />);
-    expect(await screen.findByText("Pendiente")).toBeTruthy();
+    expect(await screen.findByText("Sin presentar")).toBeTruthy();
     const input = screen.getByLabelText("Archivo PDF") as HTMLInputElement;
     expect(input.accept).toContain("application/pdf");
     expect(screen.getByRole("button", { name: "Cargar certificado" })).toBeTruthy();
@@ -38,7 +38,7 @@ describe("StudentCertificateCard", () => {
       .mockResolvedValueOnce({ present: false })
       .mockResolvedValueOnce({ present: true, originalName: "regular.pdf", sizeBytes: 1048576, uploadedAt: "2030-09-01T12:00:00Z" });
     render(<StudentCertificateCard />);
-    await screen.findByText("Pendiente");
+    await screen.findByText("Sin presentar");
     const input = screen.getByLabelText("Archivo PDF") as HTMLInputElement;
     await user.upload(input, new File(["%PDF-1.7"], "regular.pdf", { type: "application/pdf" }));
     expect(input.files).toHaveLength(1);
@@ -47,6 +47,20 @@ describe("StudentCertificateCard", () => {
     expect(api.call.mock.calls[1][1]).toMatchObject({ method: "POST", body: expect.any(FormData) });
     expect(await screen.findByText("regular.pdf")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Descargar PDF" })).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("status"));
+    expect(document.activeElement).toBe(screen.getByText("Certificado cargado."));
+  });
+
+  it("shows a rejection reason and warns that replacement resets review", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    api.call.mockResolvedValueOnce({ present: true, originalName: "rechazado.pdf", sizeBytes: 100, reviewStatus: "rejected", rejectionReason: "Falta sello" });
+    render(<StudentCertificateCard />);
+    expect(await screen.findByText("Rechazado")).toBeTruthy();
+    expect(screen.getByText("Motivo: Falta sello")).toBeTruthy();
+    const input = screen.getByLabelText("Nuevo PDF") as HTMLInputElement;
+    await user.upload(input, new File(["%PDF-1.7"], "nuevo.pdf", { type: "application/pdf" }));
+    fireEvent.submit(input.form as HTMLFormElement);
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("volverá a quedar pendiente"));
+    expect(api.call).toHaveBeenCalledTimes(1);
   });
 });

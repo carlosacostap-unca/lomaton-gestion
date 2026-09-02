@@ -44,6 +44,10 @@ El MCP está bloqueado a HTTPS y al host productivo. Por decisión operativa exp
 
 Para habilitar certificados, `apply_lomaton_schema` crea aditivamente `student_certificates` con un único registro por candidato, PDF protegido de hasta 10 MiB y reglas exclusivas para `lomaton_server`. Después se debe comprobar que el acceso anónimo y los tokens humanos de candidato o administrador reciben denegación al intentar acceder directamente a registros o archivos. Los flujos válidos pasan siempre por los Route Handlers de Next.js.
 
+La revisión agrega aditivamente `reviewStatus` (`pending`, `approved`, `rejected`), `reviewedBy`, `reviewedAt` y `rejectionReason` (máximo 1.000 caracteres), además de `idx_student_certificates_review_status`. Tras aplicar el esquema, ejecutar `backfill_student_certificate_reviews`: sólo asigna `pending` cuando el estado está vacío, rechaza valores desconocidos y comprueba que archivo, SHA-256, nombre original y tamaño no cambien. Una segunda ejecución debe informar cero actualizaciones.
+
+Monitorear errores `invalid_certificate_review_status`, `certificate_review_conflict` y fallos de Batch. Un 409 es recuperable: el administrador debe releer el PDF vigente. La cola pendiente incluye temporalmente estados vacíos hasta completar el backfill. No usar FTCA, membresías ni equipos para derivar o almacenar decisiones documentales.
+
 La aplicación idempotente crea o actualiza solamente elementos conocidos. No elimina colecciones, campos ni registros. Batch está configurado con 11.000 solicitudes, 60 segundos y 16 MiB para cubrir una importación máxima y sus proyecciones.
 
 ## Google OAuth2
@@ -62,4 +66,6 @@ Antes de enviar a `main`, ejecutar `npm run typecheck`, `npm run lint`, `npm tes
 
 Para revertir código, seleccionar el despliegue anterior de Next.js o revertir el commit. Para un problema de esquema, detener escrituras, evaluar el alcance y restaurar el backup sólo si la corrección aditiva no es segura. Restaurar PocketBase reemplaza datos posteriores al backup, por lo que no es el primer mecanismo de rollback.
 
-La colección documental es una migración aditiva: ante un rollback de Next.js se conserva cerrada y no afecta equipos. No eliminar automáticamente la colección ni certificados reales. Para una aceptación se puede cargar un PDF ficticio, comprobar carga, reemplazo y ambas descargas, eliminar únicamente los registros E2E identificados y validar la línea base. `POCKETBASE_ALLOW_WRITES` y `POCKETBASE_ALLOW_DELETES` permanecen en `true` por decisión explícita del operador.
+La colección documental y sus campos de revisión son una migración aditiva: ante un rollback de Next.js se conservan cerrados y no afectan equipos. La versión anterior ignora los campos nuevos; una corrección aditiva es el rollback preferido. No quitar el índice, los campos ni certificados reales automáticamente. Restaurar el backup sólo después de detener escrituras y aceptar la pérdida de datos posteriores.
+
+Para aceptación productiva, usar un candidato y PDF ficticios identificables; registrar línea base de certificados, equipos y membresías; comprobar pendiente, aprobación, rechazo con motivo, corrección, reemplazo que reinicia a pendiente, conflicto con una versión anterior y ambas descargas. Eliminar únicamente el registro/archivo E2E identificado y sus datos ficticios relacionados, nunca registros reales; repetir los conteos de línea base y verificar que FTCA, equipos y membresías no variaron. `POCKETBASE_ALLOW_WRITES` y `POCKETBASE_ALLOW_DELETES` permanecen en `true` por decisión explícita del operador.

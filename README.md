@@ -23,14 +23,14 @@ Las pruebas externas que podrían escribir datos quedan omitidas salvo configura
 
 ## OpenSpec
 
-El cambio activo es `subir-certificado-alumno-regular`. Para consultar o continuar su implementación:
+El cambio activo es `revisar-certificados-alumno-regular`. Para consultar o continuar su implementación:
 
 ```text
-openspec status --change subir-certificado-alumno-regular
-openspec instructions apply --change subir-certificado-alumno-regular
+openspec status --change revisar-certificados-alumno-regular
+openspec instructions apply --change revisar-certificados-alumno-regular
 ```
 
-Los artefactos están en `openspec/changes/subir-certificado-alumno-regular/`.
+Los artefactos están en `openspec/changes/revisar-certificados-alumno-regular/`.
 
 ## Despliegue
 

@@ -12,7 +12,10 @@ export const expectedFields = {
     "sourceRole", "sourceRowNumber", "rawSource", "reviewStatus", "importBatch",
   ],
   candidates: ["registration", "fullName", "firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
-  student_certificates: ["candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy"],
+  student_certificates: [
+    "candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy",
+    "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason",
+  ],
   mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
   teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
@@ -270,6 +273,57 @@ export function candidateProjectionFields(registrationsCollectionId) {
 }
 
 export const certificateStructuralMaxBytes = 10 * 1024 * 1024;
+export const certificateReviewStatuses = ["pending", "approved", "rejected"];
+export const certificateRejectionReasonMaxLength = 1000;
+
+export function studentCertificateReviewFields(usersCollectionId) {
+  return [
+    {
+      name: "reviewStatus",
+      type: "select",
+      required: false,
+      maxSelect: 1,
+      values: certificateReviewStatuses,
+    },
+    {
+      name: "reviewedBy",
+      type: "relation",
+      required: false,
+      collectionId: usersCollectionId,
+      maxSelect: 1,
+      cascadeDelete: false,
+    },
+    { name: "reviewedAt", type: "date", required: false },
+    {
+      name: "rejectionReason",
+      type: "text",
+      required: false,
+      max: certificateRejectionReasonMaxLength,
+    },
+  ];
+}
+
+export function planStudentCertificateReviewBackfill(records) {
+  const invalid = [];
+  const updates = [];
+  let alreadyClassified = 0;
+  for (const record of records) {
+    const status = String(record.reviewStatus || "").trim();
+    if (!status) {
+      updates.push({ id: record.id, data: { reviewStatus: "pending" } });
+    } else if (certificateReviewStatuses.includes(status)) {
+      alreadyClassified += 1;
+    } else {
+      invalid.push({ id: record.id, reviewStatus: status });
+    }
+  }
+  return {
+    total: records.length,
+    alreadyClassified,
+    updates,
+    invalid,
+  };
+}
 
 export function studentCertificatesCollection(candidatesCollectionId, usersCollectionId) {
   return {
@@ -305,9 +359,11 @@ export function studentCertificatesCollection(candidatesCollectionId, usersColle
         maxSelect: 1,
         cascadeDelete: false,
       },
+      ...studentCertificateReviewFields(usersCollectionId),
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_student_certificates_candidate ON student_certificates (candidate)",
+      "CREATE INDEX idx_student_certificates_review_status ON student_certificates (reviewStatus)",
     ],
   };
 }

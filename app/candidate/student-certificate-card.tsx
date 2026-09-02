@@ -10,7 +10,15 @@ export type CertificateMetadata = {
   sizeBytes?: number;
   uploadedAt?: string;
   maxBytes?: number;
+  reviewStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string;
 };
+
+const reviewLabels = {
+  pending: "Pendiente de revisión",
+  approved: "Aprobado",
+  rejected: "Rechazado",
+} as const;
 
 function formatBytes(bytes = 0) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(bytes / 1024 / 1024) + " MiB";
@@ -49,7 +57,12 @@ export function StudentCertificateCard() {
     const input = form.elements.namedItem("certificate") as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return setMessage("Seleccioná un archivo PDF.");
-    if (metadata?.present && !window.confirm("¿Reemplazar el certificado actual por el archivo seleccionado?")) return;
+    if (metadata?.present) {
+      const warning = metadata.reviewStatus === "approved"
+        ? "El certificado está aprobado. Al reemplazarlo volverá a quedar pendiente de revisión. ¿Continuar?"
+        : "Al reemplazar el certificado, cualquier revisión anterior se reiniciará y volverá a quedar pendiente. ¿Continuar?";
+      if (!window.confirm(warning)) return;
+    }
     setBusy(true);
     setMessage("");
     try {
@@ -85,10 +98,21 @@ export function StudentCertificateCard() {
           <h2 id="certificate-title">Certificado de alumno regular</h2>
           <p className="muted">Cargá un único PDF de hasta {formatBytes(metadata?.maxBytes || 10 * 1024 * 1024)}. Podés reemplazarlo si necesitás corregirlo.</p>
         </div>
-        <span className={metadata?.present ? "status-open" : "role-chip"}>
-          {metadata === null ? "Consultando…" : metadata.present ? "Cargado" : "Pendiente"}
+        <span className={metadata?.present ? "status-open" : "role-chip"} role="status">
+          {metadata === null
+            ? "Consultando…"
+            : metadata.present
+              ? reviewLabels[metadata.reviewStatus || "pending"]
+              : "Sin presentar"}
         </span>
       </div>
+      {metadata?.present && metadata.reviewStatus === "rejected" ? (
+        <div className="alert" role="alert">
+          <strong>El certificado fue rechazado.</strong>
+          {metadata.rejectionReason ? <p>Motivo: {metadata.rejectionReason}</p> : null}
+          <p>Podés reemplazarlo por un nuevo PDF para solicitar otra revisión.</p>
+        </div>
+      ) : null}
       {metadata?.present ? (
         <div className="certificate-metadata">
           <strong>{metadata.originalName}</strong>

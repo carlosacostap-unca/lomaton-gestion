@@ -102,6 +102,15 @@ th { color: var(--green); font-size: .8rem; text-transform: uppercase; }
 .certificate-metadata strong { overflow-wrap: anywhere; }
 .certificate-admin { border: 1px solid #d9d5c7; border-radius: .75rem; padding: 1rem; }
 .certificate-admin legend { font-weight: 700; padding-inline: .35rem; }
+.certificate-admin textarea { width: min(100%, 42rem); resize: vertical; }
+.certificate-review-list { display: grid; gap: 1rem; margin-top: 1rem; }
+.certificate-review-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; padding: 1rem; border: 1px solid #d9d5c7; border-radius: .75rem; }
+.certificate-review-item p { margin-block: .25rem; }
+.certificate-review-item .certificate-admin { grid-column: 1 / -1; width: 100%; }
+@media (max-width: 640px) {
+  .certificate-review-item { grid-template-columns: 1fr; }
+  .certificate-review-item > button { width: 100%; }
+}
 .export-grid strong { grid-column: 1 / -1; }
 .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .team-admin-grid { display: grid; gap: 1rem; margin-top: 1rem; }

@@ -13,5 +13,9 @@ describe("student certificate privacy boundaries", () => {
     expect(exportRoute).not.toContain("student_certificates");
     expect(exportRoute).not.toContain("sha256");
     expect(exportRoute).not.toContain("originalName");
+    expect(exportRoute).not.toContain("rejectionReason");
+    expect(exportRoute).not.toContain("reviewedBy");
+    expect(snapshot).not.toContain("rejectionReason");
+    expect(snapshot).not.toContain("reviewedBy");
   });
 });

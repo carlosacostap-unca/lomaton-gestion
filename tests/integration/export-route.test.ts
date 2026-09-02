@@ -58,6 +58,7 @@ describe("admin export Route Handler", () => {
       candidates: [{
         id: "c1", firstName: "Ana", lastName: "Pérez",
         email: "ana@example.com", ftcaStatus: "confirmed", active: true,
+        reviewStatus: "rejected", rejectionReason: "privado", reviewedBy: "admin-secret", sha256: "hash-secret",
       }],
       teams: [],
       memberships: [],
@@ -72,9 +73,13 @@ describe("admin export Route Handler", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/csv");
     expect(response.headers.get("x-generated-at-argentina")).toBeTruthy();
-    expect(await response.text()).toContain(
+    const csv = await response.text();
+    expect(csv).toContain(
       "Ana Pérez,ana@example.com,confirmed,true,disponible",
     );
+    expect(csv).not.toContain("privado");
+    expect(csv).not.toContain("admin-secret");
+    expect(csv).not.toContain("hash-secret");
     expect(mocks.readSnapshot).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,14 +7,17 @@ import { fileURLToPath } from "node:url";
 
 import {
   batchSettings,
+  certificateReviewStatuses,
   candidateProjectionFields,
   collectionRulePatches,
   dataVersionField,
   expectedFields,
   mentorProfilesCollection,
+  planStudentCertificateReviewBackfill,
   registrationsCollection,
   serviceAccountsCollection,
   studentCertificatesCollection,
+  studentCertificateReviewFields,
 } from "./lomaton-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -92,6 +95,7 @@ const tools = [
     maxBodySize: { type: "number", minimum: 0 },
   }),
   tool("apply_lomaton_schema", "Aplica de forma idempotente el esquema, reglas y Batch API de Lomatón sin eliminar colecciones, campos ni registros. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
+  tool("backfill_student_certificate_reviews", "Clasifica como pending solamente certificados existentes sin estado de revisión y verifica que archivo y metadatos permanezcan intactos. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("ensure_service_account", "Crea o sincroniza la cuenta técnica usando POCKETBASE_SERVICE_EMAIL y POCKETBASE_SERVICE_PASSWORD, sin devolver el secreto. Requiere POCKETBASE_ALLOW_WRITES=true.", {}),
   tool("validate_hackathon_schema", "Compara las colecciones existentes con el esquema esperado de Lomatón.", {}),
 ];
@@ -247,6 +251,35 @@ const handlers = {
       actions.push("created:student_certificates");
     }
 
+    const certificates = byName.get("student_certificates");
+    const certificateUsers = byName.get("users");
+    if (!certificates || !certificateUsers) {
+      throw rpcError(-32020, "Faltan student_certificates o users para configurar la revisión documental.");
+    }
+    const certificateFields = [...(certificates.fields || [])];
+    let certificateSchemaChanged = false;
+    for (const field of studentCertificateReviewFields(certificateUsers.id)) {
+      if (!certificateFields.some((current) => current.name === field.name)) {
+        certificateFields.push(field);
+        certificateSchemaChanged = true;
+      }
+    }
+    const certificateIndexes = [...(certificates.indexes || [])];
+    if (!certificateIndexes.some((index) => index.includes("idx_student_certificates_review_status"))) {
+      certificateIndexes.push(
+        "CREATE INDEX idx_student_certificates_review_status ON student_certificates (reviewStatus)",
+      );
+      certificateSchemaChanged = true;
+    }
+    if (certificateSchemaChanged) {
+      const updated = await pb.collections.update(certificates.id, {
+        fields: certificateFields,
+        indexes: certificateIndexes,
+      });
+      byName.set("student_certificates", updated);
+      actions.push("updated:student_certificate_reviews");
+    }
+
     const candidates = byName.get("candidates");
     const registrations = byName.get("registrations");
     if (!candidates || !registrations) {
@@ -292,6 +325,51 @@ const handlers = {
     actions.push("updated:batch_settings");
 
     return { actions, ...(await validateSchema(pb)) };
+  },
+
+  async backfill_student_certificate_reviews() {
+    requireWrites();
+    const pb = await authenticate();
+    const fields = "id,reviewStatus,certificate,sha256,originalName,sizeBytes";
+    const before = await pb.collection("student_certificates").getFullList({ fields, sort: "id" });
+    const plan = planStudentCertificateReviewBackfill(before);
+    if (plan.invalid.length) {
+      throw rpcError(-32022, "Hay certificados con estados de revisión inválidos.", {
+        invalid: plan.invalid,
+      });
+    }
+
+    for (let offset = 0; offset < plan.updates.length; offset += 1000) {
+      const batch = pb.createBatch();
+      for (const update of plan.updates.slice(offset, offset + 1000)) {
+        batch.collection("student_certificates").update(update.id, update.data);
+      }
+      await batch.send();
+    }
+
+    const after = await pb.collection("student_certificates").getFullList({ fields, sort: "id" });
+    const beforeById = new Map(before.map((record) => [record.id, record]));
+    const preserved = after.every((record) => {
+      const previous = beforeById.get(record.id);
+      return previous && ["certificate", "sha256", "originalName", "sizeBytes"]
+        .every((key) => String(previous[key] ?? "") === String(record[key] ?? ""));
+    });
+    const remaining = after.filter(
+      (record) => !certificateReviewStatuses.includes(String(record.reviewStatus || "")),
+    );
+    if (!preserved || remaining.length) {
+      throw rpcError(-32023, "El backfill de revisiones no superó la verificación posterior.", {
+        preserved,
+        remaining: remaining.map((record) => record.id),
+      });
+    }
+    return {
+      total: plan.total,
+      updated: plan.updates.length,
+      alreadyClassified: plan.alreadyClassified,
+      preserved,
+      remaining: remaining.length,
+    };
   },
 
   async ensure_service_account() {

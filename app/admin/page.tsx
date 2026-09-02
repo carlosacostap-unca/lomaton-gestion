@@ -11,6 +11,7 @@ import { HackathonSettings } from "./hackathon-settings";
 import { AdminTeamManager } from "./admin-team-manager";
 import { AuditLog } from "./audit-log";
 import { RegistrationImporter } from "./registration-importer";
+import { AdminCertificateReviewQueue } from "./admin-certificate-review-queue";
 
 export default function AdminPage() {
   const { user, loading, logout } = useAuth();
@@ -56,6 +57,7 @@ export default function AdminPage() {
       <AdminTeamManager />
 
       <RegistrationImporter />
+      <AdminCertificateReviewQueue />
       {message ? <div className="alert" role="status">{message}</div> : null}
       <CandidateAdminList />
       <section className="panel" aria-labelledby="exports-title">
