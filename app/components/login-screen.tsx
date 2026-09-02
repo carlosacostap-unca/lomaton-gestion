@@ -8,19 +8,16 @@ const GOOGLE_ACCOUNT_HELP =
   "https://support.google.com/accounts/answer/27441?co=GENIE.Platform%3DDesktop&hl=es";
 
 export function LoginScreen() {
-  const { loginWithGoogle } = useAuth();
+  const { authError, clearAuthError, loginWithGoogle } = useAuth();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   async function login() {
     setSubmitting(true);
-    setError("");
+    clearAuthError();
     try {
       await loginWithGoogle();
     } catch {
-      setError(
-        "No pudimos iniciar sesión. Verificá que elegiste el mismo email que figura en el padrón o contactá a la organización.",
-      );
+      // El proveedor de autenticación expone solamente mensajes públicos seguros.
     } finally {
       setSubmitting(false);
     }
@@ -37,7 +34,7 @@ export function LoginScreen() {
           inscribiste. No se usan contraseñas propias de esta aplicación.
         </p>
 
-        {error ? <div className="alert" role="alert">{error}</div> : null}
+        {authError ? <div className="alert" role="alert">{authError}</div> : null}
 
         <button
           className="google-button"

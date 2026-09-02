@@ -1,5 +1,9 @@
 import { evaluateBootstrapAccess, normalizeEmail } from "@/lib/auth/bootstrap-policy";
 import {
+  GENERIC_LOGIN_ERROR_MESSAGE,
+  getPublicBootstrapErrorMessage,
+} from "@/lib/auth/access-messages";
+import {
   createPocketBaseServiceClient,
   requirePocketBaseUser,
 } from "@/lib/pocketbase/server";
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
     if (!access.allowed) {
       throw new ApiError(
         403,
-        "El email autenticado no está habilitado para este hackatón.",
+        getPublicBootstrapErrorMessage(access.reason) ?? GENERIC_LOGIN_ERROR_MESSAGE,
         access.reason,
       );
     }
