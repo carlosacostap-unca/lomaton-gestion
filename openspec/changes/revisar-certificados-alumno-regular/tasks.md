@@ -26,5 +26,5 @@
 - [x] 4.1 Verificar mediante pruebas de integración que ninguna carga, decisión o reemplazo escriba FTCA, membresías o equipos, incluyendo candidatos pendientes, no FTCA e integrantes de equipos válidos.
 - [x] 4.2 Ejecutar las suites unitarias, de contrato, integración, concurrencia, autorización, privacidad y E2E, además de `npm run typecheck`, `npm run lint` y `npm run build`; verificar que finalicen sin errores ni advertencias nuevas sin justificar.
 - [x] 4.3 Documentar campos, backfill, índice, monitoreo, rollback aditivo y procedimiento de aceptación/limpieza; verificar que no se agreguen credenciales de iDrive E2 ni exposición directa de archivos.
-- [ ] 4.4 Confirmar un backup reciente, aplicar en producción el esquema y backfill mediante MCP y validar conteos, reglas, opciones e índice sin modificar archivos ni SHA-256 existentes.
+- [x] 4.4 Confirmar un backup reciente, aplicar en producción el esquema y backfill mediante MCP y validar conteos, reglas, opciones e índice sin modificar archivos ni SHA-256 existentes.
 - [ ] 4.5 Desplegar Next.js y realizar una aceptación productiva con un PDF ficticio que cubra pendiente, aprobación, rechazo, corrección, reemplazo, conflicto y separación de FTCA; eliminar únicamente los datos E2E identificados y comprobar la línea base.
