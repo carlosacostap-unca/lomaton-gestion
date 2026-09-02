@@ -23,14 +23,14 @@ Las pruebas externas que podrían escribir datos quedan omitidas salvo configura
 
 ## OpenSpec
 
-El cambio activo es `revisar-certificados-alumno-regular`. Para consultar o continuar su implementación:
+No hay cambios activos. El flujo de revisión de certificados está archivado y puede consultarse con:
 
 ```text
-openspec status --change revisar-certificados-alumno-regular
-openspec instructions apply --change revisar-certificados-alumno-regular
+openspec list --json
+openspec validate --specs
 ```
 
-Los artefactos están en `openspec/changes/revisar-certificados-alumno-regular/`.
+Los artefactos finalizados están en `openspec/changes/archive/2026-09-02-revisar-certificados-alumno-regular/`.
 
 ## Despliegue
 
