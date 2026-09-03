@@ -44,6 +44,7 @@ const ownRoute = await import("@/app/api/lomaton/certificates/me/route");
 const ownDownloadRoute = await import("@/app/api/lomaton/certificates/me/download/route");
 const adminRoute = await import("@/app/api/lomaton/admin/candidates/[candidateId]/certificate/route");
 const adminQueueRoute = await import("@/app/api/lomaton/admin/certificates/route");
+const adminDownloadRoute = await import("@/app/api/lomaton/admin/candidates/[candidateId]/certificate/download/route");
 
 const service = { collection: () => ({ getOne: vi.fn().mockResolvedValue({ id: "candidate000001" }) }) };
 const auth = {
@@ -123,6 +124,16 @@ describe("student certificate Route Handlers", () => {
     );
     expect(response.status).toBe(403);
     expect(findCertificate).not.toHaveBeenCalled();
+  });
+
+  it("does not let a non-admin retrieve another candidate's PDF", async () => {
+    requireAdmin.mockRejectedValue(new ApiError(403, "Admin requerido", "admin_required"));
+    const response = await adminDownloadRoute.GET(
+      new Request("https://app.example/api/lomaton/admin/candidates/candidate000002/certificate/download"),
+      { params: Promise.resolve({ candidateId: "candidate000002" }) },
+    );
+    expect(response.status).toBe(403);
+    expect(proxy).not.toHaveBeenCalled();
   });
 
   it("allows an administrator to inspect another candidate and maps storage errors", async () => {

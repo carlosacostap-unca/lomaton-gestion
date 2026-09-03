@@ -124,7 +124,10 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await authenticate(adminContext, adminAuth);
   const adminPage = await adminContext.newPage();
   await adminPage.goto("/admin");
-  await expect(adminPage.getByRole("heading", { name: "Padrón de candidatos" })).toBeVisible();
+  await expect(adminPage.getByRole("heading", { name: "Panel del Lomatón" })).toBeVisible();
+  const adminNavigation = adminPage.getByRole("navigation", { name: "Secciones de administración" });
+  await expect(adminNavigation.getByRole("link")).toHaveCount(6);
+  await adminNavigation.getByRole("link", { name: "Configuración" }).click();
   await expect(adminPage.getByLabel("Fecha y hora límite (Argentina)")).toBeVisible();
   expect(await adminPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await adminContext.close();

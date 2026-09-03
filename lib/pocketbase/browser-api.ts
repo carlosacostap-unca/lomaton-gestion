@@ -51,10 +51,11 @@ export async function callLomatonApi<T = unknown>(
   return response.json() as Promise<T>;
 }
 
-export async function downloadLomatonFile(path: string) {
+export async function fetchLomatonFile(path: string, options: { signal?: AbortSignal } = {}) {
   const response = await fetch(path, {
     headers: { Authorization: getBrowserAuthorizationHeader() },
     cache: "no-store",
+    signal: options.signal,
   });
   if (!response.ok) {
     const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
@@ -72,3 +73,5 @@ export async function downloadLomatonFile(path: string) {
     filename: encoded ? decodeURIComponent(encoded) : plain || "certificado-alumno-regular.pdf",
   };
 }
+
+export const downloadLomatonFile = fetchLomatonFile;

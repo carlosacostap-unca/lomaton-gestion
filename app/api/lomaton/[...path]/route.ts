@@ -25,6 +25,7 @@ import {
   removeAdminMentorship,
 } from "@/lib/domain/mentor-commands";
 import { getOwnProfile, updateOwnProfile } from "@/lib/domain/participant-profile";
+import { getAdminTeamDetail, listAdminTeamSummaries } from "@/lib/domain/admin-team-views";
 import {
   listAdminRegistrations,
   updateAdminRegistration,
@@ -127,6 +128,12 @@ export async function GET(request: Request, routeContext: Context) {
       const { pb } = await adminContext(request);
       if (path.length === 2 && path[1] === "report-snapshot") {
         return Response.json(await readConsistentReportSnapshot(pb));
+      }
+      if (path.length === 2 && path[1] === "teams") {
+        return Response.json(await listAdminTeamSummaries(pb));
+      }
+      if (path.length === 3 && path[1] === "teams") {
+        return Response.json(await getAdminTeamDetail(pb, path[2]));
       }
       if (path.length === 2 && path[1] === "registrations") {
         const query = new URL(request.url).searchParams.get("query") ?? "";

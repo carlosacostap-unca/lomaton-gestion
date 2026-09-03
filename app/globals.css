@@ -44,6 +44,16 @@ h2 { margin: .75rem 0 .5rem; font-size: 1.5rem; }
 .alert { margin: 1rem 0; padding: .9rem 1rem; border-left: .3rem solid var(--orange); background: #fff1e8; line-height: 1.5; }
 .privacy-note { margin: 1.5rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.5; }
 .app-shell { width: min(100% - 2rem, 72rem); margin: 0 auto; padding: 3rem 0; }
+.admin-shell { width: min(100% - 2rem, 86rem); margin: 0 auto; padding: 2rem 0 3rem; }
+.admin-header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding-bottom: 1.25rem; }
+.admin-header h1 { font-size: clamp(1.8rem, 5vw, 2.8rem); }
+.admin-workspace { display: grid; grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.admin-navigation { position: sticky; top: 1rem; display: grid; gap: .4rem; padding: .65rem; border: 1px solid var(--line); border-radius: 1rem; background: color-mix(in srgb, var(--card) 96%, transparent); }
+.admin-navigation-link { display: block; padding: .8rem .9rem; border-radius: .7rem; color: var(--green-dark); font-weight: 800; text-decoration: none; }
+.admin-navigation-link:hover { background: #eef2e7; }
+.admin-navigation-link.is-active { background: var(--green); color: white; }
+.admin-content { min-width: 0; }
+.admin-content > .panel:first-child { margin-top: 0; }
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .app-header h1 { font-size: clamp(1.8rem, 5vw, 3rem); }
 .secondary-button { width: auto; padding: 0 1.2rem; border: 1px solid var(--green); background: transparent; color: var(--green); }
@@ -106,11 +116,17 @@ th { color: var(--green); font-size: .8rem; text-transform: uppercase; }
 .certificate-metadata strong { overflow-wrap: anywhere; }
 .certificate-admin { border: 1px solid #d9d5c7; border-radius: .75rem; padding: 1rem; }
 .certificate-admin legend { font-weight: 700; padding-inline: .35rem; }
-.certificate-admin textarea { width: min(100%, 42rem); resize: vertical; }
-.certificate-review-list { display: grid; gap: 1rem; margin-top: 1rem; }
+.certificate-admin textarea { width: 100%; resize: vertical; }
+.certificate-detail { display: grid; gap: .8rem; }
+.certificate-viewer { min-height: 34rem; display: grid; place-items: stretch; border: 1px solid var(--line); border-radius: .75rem; background: white; overflow: hidden; }
+.certificate-viewer object { width: 100%; min-height: 34rem; border: 0; }
+.certificate-review-workspace { display: grid; grid-template-columns: minmax(15rem, .8fr) minmax(22rem, 1.4fr); gap: 1rem; margin-top: 1rem; align-items: start; }
+.certificate-review-list { display: grid; gap: .75rem; margin: 0; }
 .certificate-review-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: start; padding: 1rem; border: 1px solid #d9d5c7; border-radius: .75rem; }
+.certificate-review-item.is-selected { border-color: var(--green); box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 22%, transparent); }
 .certificate-review-item p { margin-block: .25rem; }
-.certificate-review-item .certificate-admin { grid-column: 1 / -1; width: 100%; }
+.certificate-review-detail { position: sticky; top: 1rem; min-width: 0; }
+.empty-detail { padding: 2rem; border: 1px dashed var(--line); border-radius: .75rem; text-align: center; }
 @media (max-width: 640px) {
   .certificate-review-item { grid-template-columns: 1fr; }
   .certificate-review-item > button { width: 100%; }
@@ -120,6 +136,23 @@ th { color: var(--green); font-size: .8rem; text-transform: uppercase; }
 .team-admin-grid { display: grid; gap: 1rem; margin-top: 1rem; }
 .team-admin-card { border: 1px solid #d7ddcf; border-radius: .9rem; padding: 1rem; background: #fbfcf9; }
 .team-admin-card h3 { margin: 0 0 .45rem; }
+.team-list-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, .4fr); gap: .75rem; margin: 1.25rem 0; }
+.team-list-filters input, .team-list-filters select, .team-create-panel input, .team-create-panel select, #admin-reason { width: 100%; min-height: 3rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; background: white; }
+.team-create-panel { margin-block: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; background: #f7f8f2; }
+.team-create-panel summary { cursor: pointer; color: var(--green); font-weight: 800; }
+.team-summary-list { display: grid; gap: .75rem; }
+.team-summary-card { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(18rem, 1.4fr) minmax(10rem, .8fr) auto; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: white; }
+.team-summary-card h3 { margin: 0 0 .45rem; }
+.team-summary-data { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+.team-summary-data div { min-width: 0; }
+.team-summary-data dt { color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.team-summary-data dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.team-warning { color: #8f310d; font-weight: 750; }
+.team-detail-heading { margin-top: 1.25rem; }
+.team-detail-heading h2 { margin-top: .15rem; }
+.team-detail-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+.team-detail-sections > section { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: #fbfcf9; }
+.team-detail-sections h3 { margin-top: 0; }
 .member-list { display: grid; gap: .45rem; padding: 0; list-style: none; }
 .member-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; }
@@ -137,4 +170,24 @@ details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; 
   .search-form { grid-template-columns: 1fr; }
   .search-form > label, .search-field, .search-results { grid-column: auto; }
   .stats-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 52rem) {
+  .admin-header { align-items: flex-start; flex-direction: column; }
+  .admin-workspace { grid-template-columns: 1fr; }
+  .admin-navigation { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-navigation-link { min-width: 0; padding-inline: .45rem; text-align: center; overflow-wrap: anywhere; }
+  .certificate-review-workspace { grid-template-columns: 1fr; }
+  .certificate-review-detail { position: static; }
+  .certificate-viewer, .certificate-viewer object { min-height: 26rem; }
+  .team-summary-card { grid-template-columns: 1fr; align-items: stretch; }
+  .team-detail-sections { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 38rem) {
+  .team-list-filters, .team-summary-data { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 30rem) {
+  .admin-navigation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

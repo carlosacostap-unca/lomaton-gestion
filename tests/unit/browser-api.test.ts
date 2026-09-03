@@ -4,6 +4,7 @@ import {
   BrowserApiError,
   callLomatonApi,
   downloadLomatonFile,
+  fetchLomatonFile,
   getBrowserAuthorizationHeader,
 } from "@/lib/pocketbase/browser-api";
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
@@ -66,5 +67,19 @@ describe("PocketBase browser authorization", () => {
     const result = await downloadLomatonFile("/api/certificate/download");
     expect(result.filename).toBe("constancia.pdf");
     expect(await result.blob.text()).toBe("%PDF-1.7");
+  });
+
+  it.each([401, 403])("reports authenticated file access failures with status %s", async (status) => {
+    getBrowserPocketBase().authStore.save("session-token", null);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ message: "Acceso denegado", error: "forbidden" }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }));
+    await expect(fetchLomatonFile("/api/private.pdf")).rejects.toMatchObject({
+      name: "BrowserApiError",
+      status,
+      code: "forbidden",
+      message: "Acceso denegado",
+    });
   });
 });

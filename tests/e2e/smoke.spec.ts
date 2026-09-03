@@ -20,7 +20,10 @@ test("la aplicación responde y muestra su contenido principal", async ({ page }
   ).toBeVisible();
 
   const csp = await page.locator("body").evaluate(() => document.querySelector("meta[http-equiv='Content-Security-Policy']")?.getAttribute("content"));
-  expect(csp ?? (await page.request.get("/")).headers()["content-security-policy"]).toContain("connect-src");
+  const securityPolicy = csp ?? (await page.request.get("/")).headers()["content-security-policy"];
+  expect(securityPolicy).toContain("connect-src");
+  expect(securityPolicy).toContain("object-src blob:");
+  expect(securityPolicy).not.toContain("object-src *");
 
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);

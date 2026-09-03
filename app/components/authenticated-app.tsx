@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useAuth } from "./auth-provider";
 
 export function AuthenticatedApp() {
@@ -27,7 +29,7 @@ export function AuthenticatedApp() {
             <span className="role-chip">{participantRole === "teacher" ? "Docente" : "Estudiante"}</span>
             <h2>Mi portal</h2>
             <p>Gestioná tu perfil, invitaciones y {participantRole === "teacher" ? "mentoría" : "equipo y certificado"}.</p>
-            <a href="/portal">Ir al portal</a>
+            <Link href="/portal">Ir al portal</Link>
           </article>
         ) : null}
 
@@ -36,7 +38,7 @@ export function AuthenticatedApp() {
             <span className="role-chip">Administrador</span>
             <h2>Administración</h2>
             <p>Importá el padrón, resolvé excepciones, configurá el cierre y exportá resultados.</p>
-            <a href="/admin">Ir a administración</a>
+            <Link href="/admin">Ir a administración</Link>
           </article>
         ) : null}
       </section>

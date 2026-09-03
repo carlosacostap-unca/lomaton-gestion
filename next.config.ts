@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "object-src 'none'",
+  "object-src blob:",
   "img-src 'self' data: blob: https://lh3.googleusercontent.com",
   "font-src 'self'",
   "style-src 'self' 'unsafe-inline'",
