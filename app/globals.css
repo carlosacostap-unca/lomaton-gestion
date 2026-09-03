@@ -160,6 +160,23 @@ details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; 
 .profile-summary div { padding: .8rem; border-radius: .65rem; background: #eef2e7; }
 .profile-summary dt { color: var(--muted); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
 .profile-summary dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.student-filter { display: grid; gap: .4rem; margin: 1.25rem 0; font-weight: 800; }
+.student-filter input { width: 100%; min-height: 3rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; background: white; }
+.student-directory { display: grid; gap: .85rem; }
+.student-directory-card { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: white; }
+.student-directory-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.student-directory-heading h3 { margin: 0; overflow-wrap: anywhere; }
+.student-directory-data { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.student-directory-data div { min-width: 0; }
+.student-directory-data dt { color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.student-directory-data dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.student-status { display: inline-block; padding: .3rem .55rem; border-radius: 99rem; background: #eef2e7; font-size: .78rem; font-weight: 800; }
+.student-status.is-approved { background: var(--lime); color: var(--green-dark); }
+.student-status.is-rejected { background: #ffd4c2; color: #7d2600; }
+.student-status.is-pending { background: #fff1b8; color: #684e00; }
+.student-invitations { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.student-invitations ul { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.student-invitations li { padding: .3rem .55rem; border-radius: 99rem; background: #eef2e7; font-size: .82rem; }
 
 @media (max-width: 38rem) {
   .app-header { align-items: flex-start; flex-direction: column; }
@@ -182,10 +199,14 @@ details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; 
   .certificate-viewer, .certificate-viewer object { min-height: 26rem; }
   .team-summary-card { grid-template-columns: 1fr; align-items: stretch; }
   .team-detail-sections { grid-template-columns: 1fr; }
+  .student-directory-data { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 38rem) {
   .team-list-filters, .team-summary-data { grid-template-columns: 1fr; }
+  .student-directory-heading { align-items: stretch; flex-direction: column; }
+  .student-directory-heading .secondary-button { width: 100%; }
+  .student-directory-data { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 30rem) {

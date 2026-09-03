@@ -26,7 +26,9 @@ import {
 } from "@/lib/domain/mentor-commands";
 import { getOwnProfile, updateOwnProfile } from "@/lib/domain/participant-profile";
 import { getAdminTeamDetail, listAdminTeamSummaries } from "@/lib/domain/admin-team-views";
+import { listAdminStudents } from "@/lib/domain/admin-student-views";
 import {
+  getAdminRegistration,
   listAdminRegistrations,
   updateAdminRegistration,
 } from "@/lib/domain/registration-admin";
@@ -135,9 +137,15 @@ export async function GET(request: Request, routeContext: Context) {
       if (path.length === 3 && path[1] === "teams") {
         return Response.json(await getAdminTeamDetail(pb, path[2]));
       }
+      if (path.length === 2 && path[1] === "students") {
+        return Response.json(await listAdminStudents(pb));
+      }
       if (path.length === 2 && path[1] === "registrations") {
         const query = new URL(request.url).searchParams.get("query") ?? "";
         return Response.json(await listAdminRegistrations(pb, query));
+      }
+      if (path.length === 3 && path[1] === "registrations") {
+        return Response.json(await getAdminRegistration(pb, path[2]));
       }
       throw new ApiError(404, "La operación no existe.", "route_not_found");
     }

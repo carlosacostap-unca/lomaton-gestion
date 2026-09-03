@@ -24,6 +24,17 @@ describe("administrative workspace", () => {
     expect(screen.getByText("Contenido de equipos")).toBeTruthy();
   });
 
+  it("replaces Personas with Estudiantes and marks the new route as active", () => {
+    navigation.pathname = "/admin/estudiantes";
+    render(<AdminShell><p>Directorio</p></AdminShell>);
+    const nav = screen.getByRole("navigation", { name: "Secciones de administración" });
+    expect(nav.querySelectorAll("a")).toHaveLength(6);
+    expect(screen.queryByRole("link", { name: "Personas" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Estudiantes" }).getAttribute("href")).toBe("/admin/estudiantes");
+    expect(screen.getByRole("link", { name: "Estudiantes" }).getAttribute("aria-current")).toBe("page");
+    navigation.pathname = "/admin/equipos";
+  });
+
   it("denies the shell to a non-admin without exposing child content", () => {
     auth.value = { ...auth.value, user: { isAdmin: false, registration: "" } };
     render(<AdminShell><p>Secreto administrativo</p></AdminShell>);

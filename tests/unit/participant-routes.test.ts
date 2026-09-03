@@ -16,6 +16,8 @@ const getTeamMentor = vi.fn();
 const assignMentor = vi.fn();
 const listTeamViews = vi.fn();
 const getTeamDetail = vi.fn();
+const listStudents = vi.fn();
+const getRegistration = vi.fn();
 
 vi.doMock("@/lib/pocketbase/server", () => ({
   requirePocketBaseUser: requireUser,
@@ -31,8 +33,9 @@ vi.doMock("@/lib/domain/mentor-commands", () => ({
 }));
 vi.doMock("@/lib/domain/team-commands", () => ({ createTeam: vi.fn(), disbandOwnTeam: vi.fn(), inviteCandidate: vi.fn(), resolveOwnInvitation: vi.fn(), withdrawInvitation: vi.fn() }));
 vi.doMock("@/lib/domain/admin-commands", () => ({ addAdminTeamMember: vi.fn(), createAdminTeam: vi.fn(), disbandAdminTeam: vi.fn(), removeAdminTeamMember: vi.fn(), reconcileTeams: vi.fn(), resolveAdminInvitation: vi.fn(), updateAdminCandidate: vi.fn(), updateAdminTeam: vi.fn(), updateHackathonSettings: vi.fn() }));
-vi.doMock("@/lib/domain/registration-admin", () => ({ listAdminRegistrations: vi.fn(), updateAdminRegistration: vi.fn() }));
+vi.doMock("@/lib/domain/registration-admin", () => ({ getAdminRegistration: getRegistration, listAdminRegistrations: vi.fn(), updateAdminRegistration: vi.fn() }));
 vi.doMock("@/lib/domain/admin-team-views", () => ({ listAdminTeamSummaries: listTeamViews, getAdminTeamDetail: getTeamDetail }));
+vi.doMock("@/lib/domain/admin-student-views", () => ({ listAdminStudents: listStudents }));
 vi.doMock("@/lib/report/snapshot", () => ({ readConsistentReportSnapshot: vi.fn() }));
 
 const route = await import("@/app/api/lomaton/[...path]/route");
@@ -54,6 +57,8 @@ describe("participant catch-all routes", () => {
     assignMentor.mockResolvedValue({ id: "assignment1", team: "team1", mentor: "mentor1", source: "admin" });
     listTeamViews.mockResolvedValue({ teams: [], availableCandidates: [] });
     getTeamDetail.mockResolvedValue({ team: { id: "team1" }, members: [], invitations: [] });
+    listStudents.mockResolvedValue({ students: [] });
+    getRegistration.mockResolvedValue({ id: "registration1", fullName: "Ada" });
   });
 
   it("returns 401 for an unauthenticated own-profile request", async () => {
@@ -160,5 +165,52 @@ describe("participant catch-all routes", () => {
     );
     expect(denied.status).toBe(403);
     expect(listTeamViews).toHaveBeenCalledTimes(1);
+  });
+
+  it("protects the minimal student directory and the separate registration detail", async () => {
+    listStudents.mockResolvedValueOnce({
+      students: [{
+        registrationId: "registration1",
+        candidateId: "candidate1",
+        name: "Ada",
+        faculty: "FTyCA",
+        certificateStatus: "approved",
+        team: null,
+        pendingInvitations: [],
+      }],
+    });
+    const listResponse = await route.GET(
+      new Request("https://app.test/api/lomaton/admin/students"),
+      context(["admin", "students"]),
+    );
+    expect(listResponse.status).toBe(200);
+    const payload = await listResponse.json();
+    expect(payload.students[0]).toEqual({
+      registrationId: "registration1",
+      candidateId: "candidate1",
+      name: "Ada",
+      faculty: "FTyCA",
+      certificateStatus: "approved",
+      team: null,
+      pendingInvitations: [],
+    });
+    expect(payload.students[0]).not.toHaveProperty("dni");
+    expect(payload.students[0]).not.toHaveProperty("phone");
+    expect(payload.students[0]).not.toHaveProperty("certificate");
+
+    const detailResponse = await route.GET(
+      new Request("https://app.test/api/lomaton/admin/registrations/registration1"),
+      context(["admin", "registrations", "registration1"]),
+    );
+    expect(detailResponse.status).toBe(200);
+    expect(getRegistration).toHaveBeenCalledWith(service, "registration1");
+
+    requireAdmin.mockRejectedValueOnce(new ApiError(403, "Sin permiso.", "admin_required"));
+    const denied = await route.GET(
+      new Request("https://app.test/api/lomaton/admin/students"),
+      context(["admin", "students"]),
+    );
+    expect(denied.status).toBe(403);
+    expect(listStudents).toHaveBeenCalledTimes(1);
   });
 });

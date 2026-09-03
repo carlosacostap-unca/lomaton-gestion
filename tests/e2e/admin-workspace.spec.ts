@@ -75,6 +75,16 @@ async function installAdminSession(page: Page) {
     headers: { "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=\"regular.pdf\"", "Cache-Control": "private, no-store" },
     body: "%PDF-1.7\n1 0 obj<</Type/Catalog>>endobj\n%%EOF",
   }));
+  await page.route("**/api/lomaton/admin/students", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      students: [
+        { registrationId: "registration0001", candidateId: "candidate000001", name: "Ada Integrante", faculty: "FTyCA", certificateStatus: "approved", team: { id: "team0000000001", name: "Equipo Uno" }, pendingInvitations: [] },
+        { registrationId: "registration0002", candidateId: "candidate000002", name: "Bea Invitada", faculty: "FACEN", certificateStatus: "pending", team: null, pendingInvitations: [{ id: "invite00000001", teamId: "team0000000002", teamName: "Equipo Dos" }] },
+      ],
+    }),
+  }));
 }
 
 test("admin navigates sections, previews a certificate, and manages one team", async ({ page }) => {
@@ -89,7 +99,23 @@ test("admin navigates sections, previews a certificate, and manages one team", a
   await expect(navigation.getByRole("link")).toHaveCount(6);
   await expect(navigation).not.toContainText("Reportes");
   await expect(navigation).not.toContainText("Auditoría");
+  await expect(navigation).not.toContainText("Personas");
   await expect(navigation.getByRole("link", { name: "Resumen" })).toHaveAttribute("aria-current", "page");
+
+  await navigation.getByRole("link", { name: "Estudiantes" }).click();
+  await expect(page).toHaveURL(/\/admin\/estudiantes$/);
+  await expect(page.getByText("Ada Integrante")).toBeVisible();
+  await expect(page.getByText("Bea Invitada")).toBeVisible();
+  await expect(page.getByText("Validado")).toBeVisible();
+  await expect(page.getByText("Equipo Dos")).toBeVisible();
+  await expect(page.getByText("12345678")).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Estudiantes" })).toHaveAttribute("aria-current", "page");
+  await page.reload();
+  await expect(page.getByText("Ada Integrante")).toBeVisible();
+
+  await page.goto("/admin/personas");
+  await expect(page).toHaveURL(/\/admin\/estudiantes$/);
+  await expect(page.getByText("Ada Integrante")).toBeVisible();
 
   await navigation.getByRole("link", { name: "Equipos" }).click();
   await expect(page).toHaveURL(/\/admin\/equipos$/);

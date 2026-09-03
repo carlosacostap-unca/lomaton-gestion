@@ -1,5 +1,5 @@
-import { CandidateAdminList } from "../candidate-admin-list";
+import { redirect } from "next/navigation";
 
 export default function AdminPeoplePage() {
-  return <CandidateAdminList />;
+  redirect("/admin/estudiantes");
 }

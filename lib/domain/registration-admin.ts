@@ -104,6 +104,27 @@ export async function listAdminRegistrations(pb: PocketBase, query: string) {
   };
 }
 
+export async function getAdminRegistration(pb: PocketBase, registrationId: string) {
+  const registration = await pb.collection("registrations").getOne(registrationId);
+  const [candidates, mentors] = await Promise.all([
+    pb.collection("candidates").getFullList({
+      filter: pb.filter("registration = {:registration}", { registration: registrationId }),
+    }),
+    pb.collection("mentor_profiles").getFullList({
+      filter: pb.filter("registration = {:registration}", { registration: registrationId }),
+    }),
+  ]);
+  const candidate = candidates[0];
+  const mentor = mentors[0];
+  return {
+    ...registration,
+    candidateId: candidate?.id ?? "",
+    candidateActive: Boolean(candidate?.active),
+    mentorId: mentor?.id ?? "",
+    mentorActive: Boolean(mentor?.active),
+  };
+}
+
 export async function updateAdminRegistration(
   pb: PocketBase,
   admin: LomatonUser,
