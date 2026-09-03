@@ -23,12 +23,13 @@ export async function POST(request: Request) {
       email,
     });
 
-    const [candidates, registrations, admins] = await Promise.all([
+    const [candidates, registrations, admins, jurors] = await Promise.all([
       pb.collection("candidates").getList(1, 1, { filter }),
       pb.collection("registrations").getList(1, 1, {
         filter: pb.filter("emailNormalized = {:email}", { email }),
       }),
       pb.collection("admin_allowlist").getList(1, 1, { filter }),
+      pb.collection("jurors").getList(1, 1, { filter }),
     ]);
     const registration = registrations.items[0] ?? null;
     const mentors = registration
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       registration: registration as never,
       mentor: mentors.items[0] as never,
       admin: admins.items[0] as never,
+      juror: jurors.items[0] as never,
     });
 
     if (!access.allowed) {
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
         displayName: updated.displayName,
         candidate: updated.candidate,
         registration: updated.registration,
+        juror: updated.juror,
         isAdmin: updated.isAdmin,
         enabled: updated.enabled,
       },

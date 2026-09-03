@@ -16,8 +16,9 @@ function evaluateGoogleAccess(input) {
 
   const candidate = input.candidate || null
   const admin = input.admin || null
+  const juror = input.juror || null
 
-  if (!candidate && !admin) {
+  if (!candidate && !admin && !juror) {
     return { allowed: false, reason: "email_not_authorized", email }
   }
 
@@ -26,6 +27,7 @@ function evaluateGoogleAccess(input) {
     reason: "allowed",
     email,
     candidateId: candidate ? candidate.id : "",
+    jurorId: juror ? juror.id : "",
     isAdmin: Boolean(admin),
   }
 }

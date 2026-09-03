@@ -12,6 +12,7 @@ export type LomatonUser = RecordModel & {
   isAdmin: boolean;
   candidate?: string;
   registration?: string;
+  juror?: string;
   displayName?: string;
 };
 
@@ -93,6 +94,18 @@ export async function requirePocketBaseAdmin(authorization: string | null) {
       403,
       "Se requieren permisos de administrador.",
       "admin_required",
+    );
+  }
+  return context;
+}
+
+export async function requirePocketBaseJuror(authorization: string | null) {
+  const context = await requirePocketBaseUser(authorization);
+  if (!context.user.juror) {
+    throw new ApiError(
+      403,
+      "Se requiere un jurado activo.",
+      "juror_required",
     );
   }
   return context;

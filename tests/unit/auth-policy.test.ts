@@ -70,6 +70,26 @@ describe("Google access policy", () => {
     });
   });
 
+  it("allows an active juror and links the juror profile", () => {
+    expect(evaluateBootstrapAccess({
+      email: "jury@example.edu.ar",
+      verified: true,
+      juror: { id: "juror-1", fullName: "Jurado Uno", active: true },
+    })).toMatchObject({
+      allowed: true,
+      participantRole: "juror",
+      patch: { candidate: "", registration: "", juror: "juror-1", enabled: true, displayName: "Jurado Uno" },
+    });
+  });
+
+  it("rejects an inactive juror without another active role", () => {
+    expect(evaluateBootstrapAccess({
+      email: "jury@example.edu.ar",
+      verified: true,
+      juror: { id: "juror-1", fullName: "Jurado Uno", active: false },
+    })).toMatchObject({ allowed: false, reason: "email_not_authorized" });
+  });
+
   it("cleans stale participant links when only administrator access remains", () => {
     expect(evaluateBootstrapAccess({
       email: "admin@example.edu.ar", verified: true,

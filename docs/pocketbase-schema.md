@@ -4,7 +4,7 @@ La definición vigente está en `tools/pocketbase-mcp/lomaton-schema.mjs` y se a
 
 ## Colecciones
 
-- `users`: identidad Google y vínculos `registration`/`candidate` sincronizados por bootstrap; el rol participante se deriva de la inscripción.
+- `users`: identidad Google y vínculos de inscripción, candidato y jurado sincronizados por bootstrap; admite áreas simultáneas.
 - `service_accounts`: identidad técnica de Next.js, sin OAuth/OTP ni CRUD público.
 - `registrations`: respuesta privada completa del formulario, con identidad por email y DNI, versión de perfil y marcas de campos autogestionados.
 - `candidates`: proyección operativa mínima de estudiantes; conserva `firstName`/`lastName` opcionales sólo por compatibilidad con registros anteriores.
@@ -17,10 +17,14 @@ La definición vigente está en `tools/pocketbase-mcp/lomaton-schema.mjs` y se a
 - `import_batches`: resumen de importaciones.
 - `audit_logs`: trazabilidad inmutable.
 - `student_certificates`: PDF privado por candidato y revisión administrativa independiente de FTCA/equipos.
+- `jurors`: nómina evaluadora por nombre, correo normalizado único y estado activo.
+- `evaluation_cycles`: ciclo abierto, cancelado o publicado con instantánea de cantidades, versión y responsables.
+- `jury_evaluations`: par único ciclo-jurado-equipo, puntajes enteros, criterios completados, total en centésimos y estado.
+- `evaluation_results`: agregado inmutable por ciclo y equipo que se crea al publicar.
 
 Las escrituras de dominio aceptan exclusivamente `active=true && role="lomaton_server"`. `audit_logs` permite creación técnica pero mantiene update/delete bloqueados. `admin_allowlist` sólo se modifica mediante MCP. `registrations` y `mentor_profiles` admiten lectura únicamente administrativa o técnica; DNI, teléfono, datos académicos, consentimientos y respuestas originales no existen en `candidates`. Las lecturas del navegador siguen el rol del usuario.
 
-`users.authRule` exige email verificado presente y activo en padrón o allowlist; `createRule` limita el alta al contexto `oauth2`. Password y OTP están deshabilitados para `users`.
+`users.authRule` exige email verificado presente y activo en candidatos, docentes habilitados, jurados o allowlist; `createRule` limita el alta al contexto `oauth2`. Password y OTP están deshabilitados para `users`.
 
 ## Integridad
 
@@ -33,6 +37,8 @@ Un mentor nunca forma parte de `team_memberships`, no aumenta `memberCount` y no
 `student_certificates` mantiene unicidad por candidato e índice por `reviewStatus`. Los estados permitidos son `pending`, `approved` y `rejected`; la relación opcional `reviewedBy` apunta a `users`, `reviewedAt` registra la decisión y `rejectionReason` se limita a 1.000 caracteres. `created` y `updated` son campos `autodate` explícitos porque PocketBase 0.40 no los agrega implícitamente a colecciones nuevas. El reemplazo del archivo limpia esos tres metadatos y vuelve a `pending`.
 
 El máximo de cuatro se protege con una actualización condicional del contador en cada Batch. La proyección queda en `draft`, `missing_ftca`, `complete` o `invalid` según membresías y FTCA.
+
+Las cuatro colecciones de evaluación aceptan acceso directo exclusivamente de la cuenta técnica. Sus índices garantizan un único correo de jurado, un solo ciclo abierto, un único par ciclo-jurado-equipo y un resultado por ciclo-equipo. La relación opcional de usuario a jurado también es única. Los cinco pesos son 25, 25, 20, 15 y 15 por ciento; un cero se distingue de un criterio todavía no completado mediante `completedCriteria`.
 
 ## Estado aplicado
 

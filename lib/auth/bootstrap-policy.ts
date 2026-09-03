@@ -23,7 +23,13 @@ export type BootstrapMentor = {
   active: boolean;
 };
 
-export type ParticipantRole = "student" | "teacher" | "admin";
+export type BootstrapJuror = {
+  id: string;
+  fullName: string;
+  active: boolean;
+};
+
+export type ParticipantRole = "student" | "teacher" | "juror" | "admin";
 
 export function normalizeEmail(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
@@ -37,10 +43,12 @@ export function evaluateBootstrapAccess(input: {
   registration?: BootstrapRegistration | null;
   mentor?: BootstrapMentor | null;
   admin?: BootstrapAdmin | null;
+  juror?: BootstrapJuror | null;
 }) {
   const email = normalizeEmail(input.email);
   const candidate = input.candidate?.active ? input.candidate : null;
   const admin = input.admin?.active ? input.admin : null;
+  const juror = input.juror?.active ? input.juror : null;
   const registration = input.registration ?? null;
   const student = registration && registration.relationship !== "teacher" && candidate
     ? registration
@@ -52,7 +60,7 @@ export function evaluateBootstrapAccess(input: {
   if (!email || !input.verified) {
     return { allowed: false as const, reason: "email_not_verified", email };
   }
-  if (!student && !teacher && !admin) {
+  if (!student && !teacher && !juror && !admin) {
     return { allowed: false as const, reason: "email_not_authorized", email };
   }
 
@@ -66,10 +74,11 @@ export function evaluateBootstrapAccess(input: {
     patch: {
       candidate: student && candidate ? candidate.id : "",
       registration: student?.id ?? teacher?.id ?? "",
+      juror: juror?.id ?? "",
       isAdmin: Boolean(admin),
       enabled: true,
-      displayName: registration?.fullName?.trim() || candidateName || input.currentDisplayName?.trim() || email,
+      displayName: registration?.fullName?.trim() || candidateName || juror?.fullName?.trim() || input.currentDisplayName?.trim() || email,
     },
-    participantRole: (student ? "student" : teacher ? "teacher" : "admin") as ParticipantRole,
+    participantRole: (student ? "student" : teacher ? "teacher" : juror ? "juror" : "admin") as ParticipantRole,
   };
 }

@@ -53,6 +53,21 @@ describe("participant bootstrap route", () => {
     expect(update).toHaveBeenCalledWith("user1", expect.objectContaining({ registration: "registration1", candidate: "", enabled: true }));
   });
 
+  it("links an active juror and returns the juror role", async () => {
+    const { client: pb, update } = createPocketBase({
+      candidates: [],
+      registrations: [],
+      admin_allowlist: [],
+      jurors: [{ id: "juror1", fullName: "Jurado Uno", active: true }],
+    });
+    requireUser.mockResolvedValue({ user: { id: "user1", email: "jury@example.test", verified: true } });
+    createService.mockResolvedValue(pb);
+    const response = await route.POST(new Request("https://app.test/api/lomaton/auth/bootstrap", { method: "POST" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ participantRole: "juror", user: { juror: "juror1", registration: "", candidate: "" } });
+    expect(update).toHaveBeenCalledWith("user1", expect.objectContaining({ juror: "juror1", enabled: true }));
+  });
+
   it("rejects an identity outside every register with the public assistance message", async () => {
     const { client: pb, update } = createPocketBase({
       candidates: [],

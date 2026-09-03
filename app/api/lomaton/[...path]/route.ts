@@ -29,6 +29,19 @@ import { getAdminTeamDetail, listAdminTeamSummaries } from "@/lib/domain/admin-t
 import { listAdminStudents } from "@/lib/domain/admin-student-views";
 import { listAdminTeachers } from "@/lib/domain/admin-teacher-views";
 import {
+  cancelAdminEvaluation,
+  createAdminJuror,
+  getAdminEvaluationDashboard,
+  getJuryDashboard,
+  getOwnTeamEvaluationResult,
+  listAdminJurors,
+  openAdminEvaluation,
+  publishAdminEvaluation,
+  reopenAdminEvaluation,
+  saveOwnEvaluation,
+  updateAdminJuror,
+} from "@/lib/domain/jury-evaluation";
+import {
   getAdminRegistration,
   listAdminRegistrations,
   updateAdminRegistration,
@@ -36,6 +49,7 @@ import {
 import {
   createPocketBaseServiceClient,
   requirePocketBaseAdmin,
+  requirePocketBaseJuror,
   requirePocketBaseUser,
 } from "@/lib/pocketbase/server";
 import { readConsistentReportSnapshot } from "@/lib/report/snapshot";
@@ -103,6 +117,29 @@ const profileUpdateSchema = z.object({
   mentorInterest: z.enum(["yes", "no", "not_provided"]).optional(),
 }).strict();
 const adminMentorSchema = reasonSchema.extend({ mentorId: z.string().min(1) }).strict();
+const jurorSchema = z.object({
+  fullName: z.string().trim().min(2).max(240),
+  email: z.email().max(254),
+  active: z.boolean(),
+}).strict();
+const evaluationScoresSchema = z.object({
+  innovation: z.number().int().min(0).max(10).optional(),
+  impact: z.number().int().min(0).max(10).optional(),
+  viability: z.number().int().min(0).max(10).optional(),
+  presentation: z.number().int().min(0).max(10).optional(),
+  teamwork: z.number().int().min(0).max(10).optional(),
+}).strict();
+const evaluationSaveSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+  scores: evaluationScoresSchema,
+  finalize: z.boolean(),
+}).strict();
+const evaluationVersionSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+}).strict();
+const evaluationCancelSchema = evaluationVersionSchema.extend({
+  reason: z.string().trim().min(1).max(1000),
+}).strict();
 
 async function body(request: Request) {
   try {
@@ -120,6 +157,12 @@ async function context(request: Request) {
 
 async function adminContext(request: Request) {
   const { user } = await requirePocketBaseAdmin(request.headers.get("authorization"));
+  const pb = await createPocketBaseServiceClient();
+  return { user, pb };
+}
+
+async function juryContext(request: Request) {
+  const { user } = await requirePocketBaseJuror(request.headers.get("authorization"));
   const pb = await createPocketBaseServiceClient();
   return { user, pb };
 }
@@ -144,6 +187,12 @@ export async function GET(request: Request, routeContext: Context) {
       if (path.length === 2 && path[1] === "teachers") {
         return Response.json(await listAdminTeachers(pb));
       }
+      if (path.length === 2 && path[1] === "jurors") {
+        return Response.json(await listAdminJurors(pb));
+      }
+      if (path.length === 2 && path[1] === "evaluation") {
+        return Response.json(await getAdminEvaluationDashboard(pb));
+      }
       if (path.length === 2 && path[1] === "registrations") {
         const query = new URL(request.url).searchParams.get("query") ?? "";
         return Response.json(await listAdminRegistrations(pb, query));
@@ -153,9 +202,14 @@ export async function GET(request: Request, routeContext: Context) {
       }
       throw new ApiError(404, "La operación no existe.", "route_not_found");
     }
+    if (path.length === 2 && path[0] === "jury" && path[1] === "evaluations") {
+      const { user, pb } = await juryContext(request);
+      return Response.json(await getJuryDashboard(pb, user));
+    }
     const { user, pb } = await context(request);
     if (path.length === 2 && path[0] === "me" && path[1] === "profile") return Response.json(await getOwnProfile(pb, user));
     if (path.length === 2 && path[0] === "me" && path[1] === "mentor") return Response.json(await getOwnMentorDashboard(pb, user));
+    if (path.length === 2 && path[0] === "me" && path[1] === "evaluation-result") return Response.json(await getOwnTeamEvaluationResult(pb, user));
     if (path.length === 3 && path[0] === "teams" && path[2] === "mentor") return Response.json(await getTeamMentorState(pb, user, path[1]));
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
@@ -169,6 +223,10 @@ export async function PATCH(request: Request, routeContext: Context) {
     if (path.length === 2 && path[0] === "me" && path[1] === "profile") {
       const { user, pb } = await context(request);
       return Response.json(await updateOwnProfile(pb, user, profileUpdateSchema.parse(await body(request))));
+    }
+    if (path.length === 3 && path[0] === "jury" && path[1] === "evaluations") {
+      const { user, pb } = await juryContext(request);
+      return Response.json(await saveOwnEvaluation(pb, user, path[2], evaluationSaveSchema.parse(await body(request))));
     }
     const { user, pb } = await adminContext(request);
     if (path.length === 2 && path[0] === "admin" && path[1] === "settings") {
@@ -186,6 +244,9 @@ export async function PATCH(request: Request, routeContext: Context) {
     if (path.length === 3 && path[0] === "admin" && path[1] === "registrations") {
       const input = registrationUpdateSchema.parse(await body(request));
       return Response.json(await updateAdminRegistration(pb, user, path[2], input));
+    }
+    if (path.length === 3 && path[0] === "admin" && path[1] === "jurors") {
+      return Response.json(await updateAdminJuror(pb, user, path[2], jurorSchema.parse(await body(request))));
     }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
@@ -208,6 +269,23 @@ export async function POST(request: Request, routeContext: Context) {
       if (path.length === 2 && path[1] === "reconcile-teams") {
         const input = reasonSchema.parse(await body(request));
         return Response.json(await reconcileTeams(pb, user, input.reason));
+      }
+      if (path.length === 2 && path[1] === "jurors") {
+        return Response.json(await createAdminJuror(pb, user, jurorSchema.parse(await body(request))), { status: 201 });
+      }
+      if (path.length === 3 && path[1] === "evaluation" && path[2] === "open") {
+        return Response.json(await openAdminEvaluation(pb, user), { status: 201 });
+      }
+      if (path.length === 4 && path[1] === "evaluation" && path[3] === "cancel") {
+        return Response.json(await cancelAdminEvaluation(pb, user, path[2], evaluationCancelSchema.parse(await body(request))));
+      }
+      if (path.length === 4 && path[1] === "evaluation" && path[3] === "publish") {
+        const input = evaluationVersionSchema.parse(await body(request));
+        return Response.json(await publishAdminEvaluation(pb, user, path[2], input.expectedVersion));
+      }
+      if (path.length === 4 && path[1] === "evaluations" && path[3] === "reopen") {
+        const input = reasonSchema.extend({ reason: z.string().trim().min(1).max(1000) }).parse(await body(request));
+        return Response.json(await reopenAdminEvaluation(pb, user, path[2], input.reason));
       }
       if (path.length === 4 && path[1] === "invitations" && path[3] === "resolve") {
         const input = resolutionSchema.parse(await body(request));

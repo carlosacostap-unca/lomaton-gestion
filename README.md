@@ -1,6 +1,6 @@
 # Lomatón · Gestión de equipos
 
-Aplicación Next.js 16 para importar el padrón del hackatón, autenticar participantes con Google, formar equipos de tres o cuatro integrantes y administrar excepciones. PocketBase 0.40.1 es la fuente de verdad para usuarios, candidatos, equipos, invitaciones, configuración y auditoría.
+Aplicación Next.js 16 para importar el padrón del hackatón, autenticar estudiantes, docentes, jurados y administradores con Google, formar equipos de tres o cuatro integrantes y gestionar su evaluación. PocketBase 0.40.1 es la fuente de verdad para identidades, equipos, certificados, mentorías, evaluaciones, configuración y auditoría.
 
 ## Desarrollo
 
@@ -23,7 +23,7 @@ Las pruebas externas que podrían escribir datos quedan omitidas salvo configura
 
 ## OpenSpec
 
-No hay cambios activos. El flujo de revisión de certificados está archivado y puede consultarse con:
+El cambio activo incorporar-jurado-y-evaluaciones documenta el alta de jurados, la matriz completa, los borradores, la publicación y la visibilidad privada de resultados.
 
 ```text
 openspec list --json

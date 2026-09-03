@@ -12,6 +12,7 @@ onRecordAuthWithOAuth2Request((e) => {
 
   let candidate = null
   let admin = null
+  let juror = null
 
   if (normalizedEmail) {
     try {
@@ -33,6 +34,16 @@ onRecordAuthWithOAuth2Request((e) => {
     } catch {
       admin = null
     }
+
+    try {
+      juror = e.app.findFirstRecordByFilter(
+        "jurors",
+        "emailNormalized = {:email} && active = true",
+        { email: normalizedEmail },
+      )
+    } catch {
+      juror = null
+    }
   }
 
   const decision = policy.evaluateGoogleAccess({
@@ -40,6 +51,7 @@ onRecordAuthWithOAuth2Request((e) => {
     email: normalizedEmail,
     candidate,
     admin,
+    juror,
   })
 
   if (!decision.allowed) {
@@ -63,11 +75,13 @@ onRecordAuthWithOAuth2Request((e) => {
 
   const displayName = String(
     (e.oauth2User && e.oauth2User.name) ||
-      (candidate ? `${candidate.getString("firstName")} ${candidate.getString("lastName")}` : ""),
+      (candidate ? candidate.getString("firstName") + " " + candidate.getString("lastName") : "") ||
+      (juror ? juror.getString("fullName") : ""),
   ).trim()
 
   if (user) {
     user.set("candidate", decision.candidateId)
+    user.set("juror", decision.jurorId)
     user.set("displayName", displayName)
     user.set("isAdmin", decision.isAdmin)
     user.set("enabled", true)
@@ -79,6 +93,7 @@ onRecordAuthWithOAuth2Request((e) => {
     e.createData.emailVisibility = false
     e.createData.verified = true
     e.createData.candidate = decision.candidateId
+    e.createData.juror = decision.jurorId
     e.createData.displayName = displayName
     e.createData.isAdmin = decision.isAdmin
     e.createData.enabled = true

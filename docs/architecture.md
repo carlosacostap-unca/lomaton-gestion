@@ -14,7 +14,7 @@ Cada Route Handler:
 
 1. recibe el token del usuario en `Authorization`;
 2. lo valida con `users/auth-refresh` en un cliente aislado;
-3. comprueba candidato o administrador;
+3. comprueba el rol requerido: estudiante, docente, jurado o administrador;
 4. crea otro cliente PocketBase y autentica la colección `service_accounts`;
 5. valida entradas y estado actual;
 6. envía las escrituras relacionadas mediante API Batch.
@@ -23,13 +23,15 @@ La cuenta técnica tiene `role=lomaton_server`, `active=true` y reglas de mínim
 
 ## OAuth y permisos
 
-`users` mantiene habilitado sólo Google OAuth2. Su `authRule` exige email verificado y presencia activa en `candidates` o `admin_allowlist`. Después de OAuth, `POST /api/lomaton/auth/bootstrap` sincroniza `candidate`, `isAdmin`, `enabled` y `displayName` usando la cuenta técnica. El cliente refresca la identidad antes de mostrar áreas protegidas.
+`users` mantiene habilitado sólo Google OAuth2. Su `authRule` exige email verificado y presencia activa como estudiante, docente, jurado o administrador. Después de OAuth, el bootstrap sincroniza las relaciones de participante y jurado, el permiso administrativo, el estado habilitado y el nombre visible usando la cuenta técnica. Una misma identidad puede conservar varias áreas y cada Route Handler vuelve a verificar el rol concreto.
 
 ## Integridad concurrente
 
 Los índices únicos impiden dos equipos por candidato, nombres normalizados duplicados e invitaciones pendientes duplicadas. Las incorporaciones actualizan `teams.memberCount` con una precondición `expected_member_count`; si dos solicitudes compiten por el cuarto lugar, una transacción completa falla. Cada Batch incluye membresía, invitaciones, proyección de estado y `hackathon_settings.dataVersion`.
 
 Los reportes leen `dataVersion` antes y después de la instantánea y reintentan si hubo cambios. Importaciones, intervenciones administrativas y configuración incluyen auditoría inmutable en la misma transacción.
+
+La evaluación congela jurados y equipos al abrir un ciclo y crea en un único Batch cada combinación jurado-equipo. Los puntajes se guardan como enteros y el total ponderado como centésimos. Finalizar, reabrir, cancelar y publicar actualizan estado, versión, contadores y auditoría atómicamente. La publicación crea un resultado agregado por equipo sólo después de comprobar la matriz completa; el portal estudiantil nunca recibe identidades ni evaluaciones individuales.
 
 ## Guías de Next.js 16 consultadas
 

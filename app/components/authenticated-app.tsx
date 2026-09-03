@@ -10,6 +10,7 @@ export function AuthenticatedApp() {
 
   const isAdmin = Boolean(user.isAdmin);
   const isParticipant = Boolean(user.registration);
+  const isJuror = Boolean(user.juror);
 
   return (
     <main className="app-shell">
@@ -41,9 +42,18 @@ export function AuthenticatedApp() {
             <Link href="/admin">Ir a administración</Link>
           </article>
         ) : null}
+
+        {isJuror ? (
+          <article className="role-card">
+            <span className="role-chip">Jurado</span>
+            <h2>Evaluación</h2>
+            <p>Calificá a todos los equipos, guardá borradores y finalizá tus evaluaciones.</p>
+            <Link href="/jurado">Ir a evaluación</Link>
+          </article>
+        ) : null}
       </section>
 
-      {!isParticipant && !isAdmin ? (
+      {!isParticipant && !isAdmin && !isJuror ? (
         <div className="alert" role="alert">
           La cuenta está autenticada pero no tiene permisos activos. Contactá a la organización.
         </div>

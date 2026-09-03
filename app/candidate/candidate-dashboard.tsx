@@ -8,6 +8,7 @@ import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
 import { filterCandidateInviteOptions } from "@/lib/ui/invite-option-filter";
 import { StudentCertificateCard } from "./student-certificate-card";
+import { StudentEvaluationResult } from "./student-evaluation-result";
 import { TeamMentorCard } from "@/app/portal/team-mentor-card";
 
 type CandidateState = {
@@ -136,6 +137,7 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
       </section>
       {message ? <div className="alert" role="status">{message}</div> : null}
       <StudentCertificateCard />
+      <StudentEvaluationResult />
 
       {!state.team ? (
         <div className="dashboard-grid">

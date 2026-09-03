@@ -11,7 +11,7 @@ export const participantSelfManagedFields = [
 ];
 
 export const expectedFields = {
-  users: ["candidate", "registration", "displayName", "isAdmin", "enabled"],
+  users: ["candidate", "registration", "juror", "displayName", "isAdmin", "enabled"],
   service_accounts: ["active", "role"],
   registrations: [
     "submittedAt", "fullName", "dni", "dniNormalized", "phone", "phoneNormalized",
@@ -36,6 +36,10 @@ export const expectedFields = {
   hackathon_settings: ["key", "deadlineUtc", "timezone", "formationOpen", "dataVersion"],
   import_batches: ["fileName", "fileType", "totalRows", "validRows", "invalidRows", "pendingFtcaRows", "createdBy"],
   audit_logs: ["actor", "action", "entityType", "entityId", "before", "after", "reason", "metadata"],
+  jurors: ["fullName", "email", "emailNormalized", "active", "created", "updated"],
+  evaluation_cycles: ["status", "criteriaVersion", "jurorCount", "teamCount", "requiredCount", "finalizedCount", "version", "openedBy", "openedAt", "cancelledBy", "cancelledAt", "cancelReason", "publishedBy", "publishedAt", "created", "updated"],
+  jury_evaluations: ["cycle", "juror", "team", "jurorNameSnapshot", "teamNameSnapshot", "status", "completedCriteria", "scoreInnovation", "scoreImpact", "scoreViability", "scorePresentation", "scoreTeamwork", "totalCentipoints", "version", "finalizedAt", "created", "updated"],
+  evaluation_results: ["cycle", "team", "teamNameSnapshot", "jurorCount", "innovationSum", "impactSum", "viabilitySum", "presentationSum", "teamworkSum", "totalCentipointsSum", "publishedAt", "created", "updated"],
 };
 
 const userReadRule =
@@ -55,7 +59,7 @@ export const collectionRulePatches = {
     deleteRule: null,
     manageRule: null,
     authRule:
-      'verified = true && ((@collection.candidates.emailNormalized ?= email && @collection.candidates.active ?= true) || (@collection.mentor_profiles.registration.emailNormalized ?= email && @collection.mentor_profiles.registration.relationship ?= "teacher" && @collection.mentor_profiles.active ?= true) || (@collection.admin_allowlist.emailNormalized ?= email && @collection.admin_allowlist.active ?= true))',
+      'verified = true && ((@collection.candidates.emailNormalized ?= email && @collection.candidates.active ?= true) || (@collection.mentor_profiles.registration.emailNormalized ?= email && @collection.mentor_profiles.registration.relationship ?= "teacher" && @collection.mentor_profiles.active ?= true) || (@collection.jurors.emailNormalized ?= email && @collection.jurors.active ?= true) || (@collection.admin_allowlist.emailNormalized ?= email && @collection.admin_allowlist.active ?= true))',
   },
   service_accounts: {
     listRule: null,

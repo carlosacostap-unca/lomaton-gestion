@@ -25,6 +25,13 @@ import {
   studentCertificateTimestampFields,
   teamMentorshipsCollection,
 } from "./lomaton-schema.mjs";
+import {
+  evaluationCyclesCollection,
+  evaluationResultsCollection,
+  juryEvaluationsCollection,
+  jurorsCollection,
+  juryUserField,
+} from "./jury-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -228,6 +235,12 @@ const handlers = {
       actions.push("created:service_accounts");
     }
 
+    if (!byName.has("jurors")) {
+      const created = await pb.collections.create(jurorsCollection());
+      byName.set(created.name, created);
+      actions.push("created:jurors");
+    }
+
     if (!byName.has("registrations")) {
       const importBatches = byName.get("import_batches");
       if (!importBatches) {
@@ -285,15 +298,54 @@ const handlers = {
         usersChanged = true;
       }
     }
+    const jurorsForUsers = byName.get("jurors");
+    if (!jurorsForUsers) throw rpcError(-32020, "Falta jurors para configurar usuarios.");
+    const jurorField = juryUserField(jurorsForUsers.id);
+    if (!userFields.some((current) => current.name === jurorField.name)) {
+      userFields.push(jurorField);
+      usersChanged = true;
+    }
     const userIndexes = [...(usersForProfiles.indexes || [])];
     if (!userIndexes.some((index) => index.includes("idx_users_registration"))) {
       userIndexes.push("CREATE UNIQUE INDEX idx_users_registration ON users (registration) WHERE registration != ''");
+      usersChanged = true;
+    }
+    if (!userIndexes.some((index) => index.includes("idx_users_juror"))) {
+      userIndexes.push("CREATE UNIQUE INDEX idx_users_juror ON users (juror) WHERE juror != ''");
       usersChanged = true;
     }
     if (usersChanged) {
       const updated = await pb.collections.update(usersForProfiles.id, { fields: userFields, indexes: userIndexes });
       byName.set("users", updated);
       actions.push("updated:users_registration");
+    }
+
+    const usersForEvaluation = byName.get("users");
+    const teamsForEvaluation = byName.get("teams");
+    if (!usersForEvaluation || !teamsForEvaluation) {
+      throw rpcError(-32020, "Faltan users o teams para configurar evaluaciones.");
+    }
+    if (!byName.has("evaluation_cycles")) {
+      const created = await pb.collections.create(evaluationCyclesCollection(usersForEvaluation.id));
+      byName.set(created.name, created);
+      actions.push("created:evaluation_cycles");
+    }
+    if (!byName.has("jury_evaluations")) {
+      const created = await pb.collections.create(juryEvaluationsCollection(
+        byName.get("evaluation_cycles").id,
+        jurorsForUsers.id,
+        teamsForEvaluation.id,
+      ));
+      byName.set(created.name, created);
+      actions.push("created:jury_evaluations");
+    }
+    if (!byName.has("evaluation_results")) {
+      const created = await pb.collections.create(evaluationResultsCollection(
+        byName.get("evaluation_cycles").id,
+        teamsForEvaluation.id,
+      ));
+      byName.set(created.name, created);
+      actions.push("created:evaluation_results");
     }
 
     if (!byName.has("mentor_invitations")) {

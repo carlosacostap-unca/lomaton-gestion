@@ -137,7 +137,7 @@ test("admin navigates sections, previews a certificate, and manages one team", a
   await page.goto("/admin");
 
   const navigation = page.getByRole("navigation", { name: "Secciones de administración" });
-  await expect(navigation.getByRole("link")).toHaveCount(7);
+  await expect(navigation.getByRole("link")).toHaveCount(9);
   await expect(navigation).not.toContainText("Reportes");
   await expect(navigation).not.toContainText("Auditoría");
   await expect(navigation).not.toContainText("Personas");
