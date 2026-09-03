@@ -22,6 +22,8 @@ test("la aplicación responde y muestra su contenido principal", async ({ page }
   const csp = await page.locator("body").evaluate(() => document.querySelector("meta[http-equiv='Content-Security-Policy']")?.getAttribute("content"));
   const securityPolicy = csp ?? (await page.request.get("/")).headers()["content-security-policy"];
   expect(securityPolicy).toContain("connect-src");
+  expect(securityPolicy).toContain("frame-src 'self' blob:");
+  expect(securityPolicy).not.toContain("frame-src *");
   expect(securityPolicy).toContain("object-src blob:");
   expect(securityPolicy).not.toContain("object-src *");
 
