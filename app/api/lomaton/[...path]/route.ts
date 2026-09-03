@@ -27,6 +27,7 @@ import {
 import { getOwnProfile, updateOwnProfile } from "@/lib/domain/participant-profile";
 import { getAdminTeamDetail, listAdminTeamSummaries } from "@/lib/domain/admin-team-views";
 import { listAdminStudents } from "@/lib/domain/admin-student-views";
+import { listAdminTeachers } from "@/lib/domain/admin-teacher-views";
 import {
   getAdminRegistration,
   listAdminRegistrations,
@@ -139,6 +140,9 @@ export async function GET(request: Request, routeContext: Context) {
       }
       if (path.length === 2 && path[1] === "students") {
         return Response.json(await listAdminStudents(pb));
+      }
+      if (path.length === 2 && path[1] === "teachers") {
+        return Response.json(await listAdminTeachers(pb));
       }
       if (path.length === 2 && path[1] === "registrations") {
         const query = new URL(request.url).searchParams.get("query") ?? "";

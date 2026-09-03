@@ -14,10 +14,10 @@ import { AdminShell } from "@/app/admin/layout";
 afterEach(cleanup);
 
 describe("administrative workspace", () => {
-  it("exposes only the six agreed destinations and marks the current section", () => {
+  it("exposes only the seven agreed destinations and marks the current section", () => {
     render(<AdminShell><p>Contenido de equipos</p></AdminShell>);
     const nav = screen.getByRole("navigation", { name: "Secciones de administración" });
-    expect(nav.querySelectorAll("a")).toHaveLength(6);
+    expect(nav.querySelectorAll("a")).toHaveLength(7);
     expect(screen.getByRole("link", { name: "Equipos" }).getAttribute("aria-current")).toBe("page");
     expect(nav.textContent).not.toContain("Reportes");
     expect(nav.textContent).not.toContain("Auditoría");
@@ -28,10 +28,20 @@ describe("administrative workspace", () => {
     navigation.pathname = "/admin/estudiantes";
     render(<AdminShell><p>Directorio</p></AdminShell>);
     const nav = screen.getByRole("navigation", { name: "Secciones de administración" });
-    expect(nav.querySelectorAll("a")).toHaveLength(6);
+    expect(nav.querySelectorAll("a")).toHaveLength(7);
     expect(screen.queryByRole("link", { name: "Personas" })).toBeNull();
     expect(screen.getByRole("link", { name: "Estudiantes" }).getAttribute("href")).toBe("/admin/estudiantes");
     expect(screen.getByRole("link", { name: "Estudiantes" }).getAttribute("aria-current")).toBe("page");
+    navigation.pathname = "/admin/equipos";
+  });
+
+  it("adds Docentes as the seventh active destination", () => {
+    navigation.pathname = "/admin/docentes";
+    render(<AdminShell><p>Directorio docente</p></AdminShell>);
+    const nav = screen.getByRole("navigation", { name: "Secciones de administración" });
+    expect(nav.querySelectorAll("a")).toHaveLength(7);
+    expect(screen.getByRole("link", { name: "Docentes" }).getAttribute("href")).toBe("/admin/docentes");
+    expect(screen.getByRole("link", { name: "Docentes" }).getAttribute("aria-current")).toBe("page");
     navigation.pathname = "/admin/equipos";
   });
 

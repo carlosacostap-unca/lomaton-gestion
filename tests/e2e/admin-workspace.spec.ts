@@ -13,6 +13,28 @@ const adminRecord = {
 };
 
 async function installAdminSession(page: Page) {
+  const teacherNames: Record<string, string> = { mentor000000001: "Docente Compartido", mentor000000009: "Docente Actual" };
+  const teacherAssignments = [
+    { mentorshipId: "mentorship0001", mentorId: "mentor000000001", teamId: "team0000000001" },
+    { mentorshipId: "mentorship0002", mentorId: "mentor000000001", teamId: "team0000000002" },
+    { mentorshipId: "mentorship0004", mentorId: "mentor000000009", teamId: "team0000000004" },
+  ];
+  const teacherTeams = [
+    { id: "team0000000001", name: "Equipo Norte" },
+    { id: "team0000000002", name: "Equipo Sur" },
+    { id: "team0000000003", name: "Equipo Libre" },
+    { id: "team0000000004", name: "Equipo Ocupado" },
+  ];
+  const teacherDirectory = () => ({
+    teachers: [
+      { registrationId: "registration0001", mentorId: "mentor000000001", name: "Docente Compartido", affiliation: "FTyCA", active: true, mentorInterest: "yes", eligible: true, unavailableReason: "", assignments: teacherAssignments.filter((item) => item.mentorId === "mentor000000001").map((item) => ({ mentorshipId: item.mentorshipId, teamId: item.teamId, teamName: teacherTeams.find((team) => team.id === item.teamId)?.name })) },
+      { registrationId: "registration0009", mentorId: "mentor000000009", name: "Docente Actual", affiliation: "FACEN", active: true, mentorInterest: "no", eligible: false, unavailableReason: "Sin interés en mentorías", assignments: teacherAssignments.filter((item) => item.mentorId === "mentor000000009").map((item) => ({ mentorshipId: item.mentorshipId, teamId: item.teamId, teamName: teacherTeams.find((team) => team.id === item.teamId)?.name })) },
+    ],
+    teams: teacherTeams.map((team) => {
+      const assignment = teacherAssignments.find((item) => item.teamId === team.id);
+      return { id: team.id, name: team.name, currentMentor: assignment ? { id: assignment.mentorId, name: teacherNames[assignment.mentorId] } : null };
+    }),
+  });
   await page.addInitScript(({ record }) => {
     localStorage.setItem("pocketbase_auth", JSON.stringify({ token: "admin-e2e-token", record }));
   }, { record: adminRecord });
@@ -85,6 +107,25 @@ async function installAdminSession(page: Page) {
       ],
     }),
   }));
+  await page.route("**/api/lomaton/admin/teachers", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(teacherDirectory()),
+  }));
+  await page.route("**/api/lomaton/admin/teams/*/mentor", async (route) => {
+    const teamId = route.request().url().split("/").at(-2) || "";
+    const body = route.request().postDataJSON() as { mentorId: string };
+    const existing = teacherAssignments.find((item) => item.teamId === teamId);
+    if (existing) existing.mentorId = body.mentorId;
+    else teacherAssignments.push({ mentorshipId: `mentorship${teacherAssignments.length + 1}`, mentorId: body.mentorId, teamId });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ team: teamId, mentor: body.mentorId }) });
+  });
+  await page.route("**/api/lomaton/admin/team-mentorships/*", async (route) => {
+    const mentorshipId = route.request().url().split("/").at(-1) || "";
+    const index = teacherAssignments.findIndex((item) => item.mentorshipId === mentorshipId);
+    if (index >= 0) teacherAssignments.splice(index, 1);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ removed: true }) });
+  });
 }
 
 test("admin navigates sections, previews a certificate, and manages one team", async ({ page }) => {
@@ -96,7 +137,7 @@ test("admin navigates sections, previews a certificate, and manages one team", a
   await page.goto("/admin");
 
   const navigation = page.getByRole("navigation", { name: "Secciones de administración" });
-  await expect(navigation.getByRole("link")).toHaveCount(6);
+  await expect(navigation.getByRole("link")).toHaveCount(7);
   await expect(navigation).not.toContainText("Reportes");
   await expect(navigation).not.toContainText("Auditoría");
   await expect(navigation).not.toContainText("Personas");
@@ -116,6 +157,34 @@ test("admin navigates sections, previews a certificate, and manages one team", a
   await page.goto("/admin/personas");
   await expect(page).toHaveURL(/\/admin\/estudiantes$/);
   await expect(page.getByText("Ada Integrante")).toBeVisible();
+
+  await navigation.getByRole("link", { name: "Docentes" }).click();
+  await expect(page).toHaveURL(/\/admin\/docentes$/);
+  await expect(page.getByRole("heading", { name: "Docente Compartido" })).toBeVisible();
+  await expect(page.getByText("Equipos asignados (2)")).toBeVisible();
+  await page.getByRole("button", { name: "Gestionar Docente Compartido" }).click();
+  await page.getByRole("combobox", { name: "Equipo", exact: true }).selectOption("team0000000003");
+  await page.getByRole("button", { name: "Asignar equipo" }).click();
+  await expect(page.getByText("Mentoría asignada por administración.")).toBeVisible();
+  await expect(page.getByText("Equipos asignados (3)")).toBeVisible();
+  await page.getByRole("combobox", { name: "Equipo", exact: true }).selectOption("team0000000004");
+  await expect(page.getByText(/dejará de tener a Docente Actual/)).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar reemplazo" }).click();
+  await expect(page.getByText("Mentoría reemplazada por administración.")).toBeVisible();
+  await expect(page.getByText("Equipos asignados (4)")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  const teacherCard = page.locator("article").filter({ has: page.getByRole("heading", { name: "Docente Compartido" }) });
+  await teacherCard.locator(".teacher-assignments").getByText("Equipo Norte", { exact: true }).locator("..").getByRole("button", { name: "Retirar" }).click();
+  await expect(page.getByText("Mentoría retirada por administración.")).toBeVisible();
+  await expect(page.getByText("Equipos asignados (3)")).toBeVisible();
+  await expect(teacherCard.locator(".teacher-assignments").getByText("Equipo Sur", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(navigation.getByRole("link", { name: "Docentes" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Equipos asignados (3)")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Gestionar Docente Compartido" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 800 });
 
   await navigation.getByRole("link", { name: "Equipos" }).click();
   await expect(page).toHaveURL(/\/admin\/equipos$/);

@@ -10,6 +10,7 @@ export const adminDestinations = [
   { href: "/admin/equipos", label: "Equipos" },
   { href: "/admin/certificados", label: "Certificados" },
   { href: "/admin/estudiantes", label: "Estudiantes" },
+  { href: "/admin/docentes", label: "Docentes" },
   { href: "/admin/importacion", label: "Importación" },
   { href: "/admin/configuracion", label: "Configuración" },
 ] as const;

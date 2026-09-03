@@ -177,6 +177,22 @@ details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; 
 .student-invitations { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
 .student-invitations ul { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .student-invitations li { padding: .3rem .55rem; border-radius: 99rem; background: #eef2e7; font-size: .82rem; }
+.teacher-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, .35fr); gap: .75rem; margin: 1.25rem 0; }
+.teacher-filters label, .teacher-management label { display: grid; gap: .4rem; font-weight: 800; }
+.teacher-filters input, .teacher-filters select, .teacher-management input, .teacher-management select { width: 100%; min-height: 3rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; background: white; }
+.teacher-directory { display: grid; gap: .85rem; }
+.teacher-directory-card { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: white; }
+.teacher-directory-heading { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(10rem, .7fr) auto; align-items: center; gap: 1rem; }
+.teacher-directory-heading h3, .teacher-directory-heading p { margin: 0; }
+.teacher-directory-heading p { margin-top: .25rem; color: var(--muted); }
+.teacher-availability { display: grid; justify-items: start; gap: .35rem; }
+.teacher-availability small { color: var(--muted); }
+.teacher-assignments { margin-top: 1rem; }
+.teacher-assignments ul { display: flex; flex-wrap: wrap; gap: .5rem; margin: .65rem 0 0; padding: 0; list-style: none; }
+.teacher-assignments li { display: flex; align-items: center; gap: .65rem; padding: .4rem .65rem; border-radius: .65rem; background: #eef2e7; }
+.teacher-management { display: grid; gap: .75rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; background: #f7f8f2; }
+.mentor-replacement-warning { padding: .8rem; border-left: .3rem solid var(--orange); background: #fff1e8; }
+.mentor-replacement-warning p { margin: .35rem 0 0; }
 
 @media (max-width: 38rem) {
   .app-header { align-items: flex-start; flex-direction: column; }
@@ -200,10 +216,15 @@ details pre { max-width: 34rem; white-space: pre-wrap; overflow-wrap: anywhere; 
   .team-summary-card { grid-template-columns: 1fr; align-items: stretch; }
   .team-detail-sections { grid-template-columns: 1fr; }
   .student-directory-data { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teacher-directory-heading { grid-template-columns: 1fr auto; }
+  .teacher-directory-heading .teacher-availability { grid-column: 1 / -1; grid-row: 2; }
 }
 
 @media (max-width: 38rem) {
   .team-list-filters, .team-summary-data { grid-template-columns: 1fr; }
+  .teacher-filters, .teacher-directory-heading { grid-template-columns: 1fr; }
+  .teacher-directory-heading .teacher-availability { grid-column: auto; grid-row: auto; }
+  .teacher-directory-heading .secondary-button, .teacher-management .primary-button { width: 100%; }
   .student-directory-heading { align-items: stretch; flex-direction: column; }
   .student-directory-heading .secondary-button { width: 100%; }
   .student-directory-data { grid-template-columns: 1fr; }

@@ -17,6 +17,7 @@ const assignMentor = vi.fn();
 const listTeamViews = vi.fn();
 const getTeamDetail = vi.fn();
 const listStudents = vi.fn();
+const listTeachers = vi.fn();
 const getRegistration = vi.fn();
 
 vi.doMock("@/lib/pocketbase/server", () => ({
@@ -36,6 +37,7 @@ vi.doMock("@/lib/domain/admin-commands", () => ({ addAdminTeamMember: vi.fn(), c
 vi.doMock("@/lib/domain/registration-admin", () => ({ getAdminRegistration: getRegistration, listAdminRegistrations: vi.fn(), updateAdminRegistration: vi.fn() }));
 vi.doMock("@/lib/domain/admin-team-views", () => ({ listAdminTeamSummaries: listTeamViews, getAdminTeamDetail: getTeamDetail }));
 vi.doMock("@/lib/domain/admin-student-views", () => ({ listAdminStudents: listStudents }));
+vi.doMock("@/lib/domain/admin-teacher-views", () => ({ listAdminTeachers: listTeachers }));
 vi.doMock("@/lib/report/snapshot", () => ({ readConsistentReportSnapshot: vi.fn() }));
 
 const route = await import("@/app/api/lomaton/[...path]/route");
@@ -58,6 +60,7 @@ describe("participant catch-all routes", () => {
     listTeamViews.mockResolvedValue({ teams: [], availableCandidates: [] });
     getTeamDetail.mockResolvedValue({ team: { id: "team1" }, members: [], invitations: [] });
     listStudents.mockResolvedValue({ students: [] });
+    listTeachers.mockResolvedValue({ teachers: [], teams: [] });
     getRegistration.mockResolvedValue({ id: "registration1", fullName: "Ada" });
   });
 
@@ -212,5 +215,41 @@ describe("participant catch-all routes", () => {
     );
     expect(denied.status).toBe(403);
     expect(listStudents).toHaveBeenCalledTimes(1);
+  });
+
+  it("protects the minimal teacher directory with admin authorization", async () => {
+    listTeachers.mockResolvedValueOnce({
+      teachers: [{
+        registrationId: "registration2",
+        mentorId: "mentor1",
+        name: "Docente Ada",
+        affiliation: "FTyCA",
+        active: true,
+        mentorInterest: "yes",
+        eligible: true,
+        unavailableReason: "",
+        assignments: [{ mentorshipId: "mentorship1", teamId: "team1", teamName: "Equipo Uno" }],
+      }],
+      teams: [{ id: "team1", name: "Equipo Uno", currentMentor: { id: "mentor1", name: "Docente Ada" } }],
+    });
+    const response = await route.GET(
+      new Request("https://app.test/api/lomaton/admin/teachers"),
+      context(["admin", "teachers"]),
+    );
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.teachers[0]).toMatchObject({ name: "Docente Ada", eligible: true });
+    expect(payload.teachers[0]).not.toHaveProperty("dni");
+    expect(payload.teachers[0]).not.toHaveProperty("phone");
+    expect(payload.teachers[0]).not.toHaveProperty("email");
+    expect(listTeachers).toHaveBeenCalledWith(service);
+
+    requireAdmin.mockRejectedValueOnce(new ApiError(403, "Sin permiso.", "admin_required"));
+    const denied = await route.GET(
+      new Request("https://app.test/api/lomaton/admin/teachers"),
+      context(["admin", "teachers"]),
+    );
+    expect(denied.status).toBe(403);
+    expect(listTeachers).toHaveBeenCalledTimes(1);
   });
 });
