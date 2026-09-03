@@ -10,8 +10,10 @@ import {
   disbandOwnTeam,
   inviteCandidate,
   resolveOwnInvitation,
+  updateTeamChallenge,
 } from "@/lib/domain/team-commands";
 import type { LomatonUser } from "@/lib/pocketbase/server";
+import { TEAM_CHALLENGES } from "@/lib/domain/team-challenges";
 
 type RecordItem = Record<string, unknown> & { id: string };
 type Seed = Record<string, RecordItem[]>;
@@ -100,6 +102,41 @@ function baseSeed(): Seed {
 }
 
 describe("candidate team commands", () => {
+  it("lets a current member select, replace and resubmit the single team challenge", async () => {
+    const seed = baseSeed();
+    seed.team_memberships = [{ id: "membership0001", team: "team0000000001", candidate: owner.candidate }];
+    const { pb, operations, send } = fakePocketBase(seed);
+
+    for (const challenge of TEAM_CHALLENGES) {
+      await expect(updateTeamChallenge(pb, owner, "team0000000001", challenge.id))
+        .resolves.toMatchObject({ teamId: "team0000000001", challenge });
+    }
+    await expect(updateTeamChallenge(pb, owner, "team0000000001", "edificios-sustentables"))
+      .resolves.toMatchObject({ challenge: { title: "Edificios sustentables y mejora de espacios" } });
+
+    expect(send).toHaveBeenCalledTimes(6);
+    expect(operations).toEqual(expect.arrayContaining([
+      ...TEAM_CHALLENGES.map((challenge) => expect.objectContaining({
+        collection: "teams", method: "update", id: "team0000000001", data: { challenge: challenge.id },
+      })),
+      expect.objectContaining({ collection: "hackathon_settings", method: "update" }),
+    ]));
+  });
+
+  it("rejects invalid challenges, outsiders and users without a student profile", async () => {
+    const seed = baseSeed();
+    seed.team_memberships = [{ id: "membership0002", team: "team0000000002", candidate: owner.candidate }];
+    const { pb, send } = fakePocketBase(seed);
+
+    await expect(updateTeamChallenge(pb, owner, "team0000000001", "desafio-libre"))
+      .rejects.toMatchObject({ status: 400, code: "invalid_team_challenge" });
+    await expect(updateTeamChallenge(pb, owner, "team0000000001", "transito-planta"))
+      .rejects.toMatchObject({ status: 403, code: "team_membership_required" });
+    await expect(updateTeamChallenge(pb, { ...owner, candidate: "" }, "team0000000001", "transito-planta"))
+      .rejects.toMatchObject({ status: 403, code: "candidate_required" });
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("creates the team and owner membership atomically", async () => {
     const { pb, operations, send } = fakePocketBase(baseSeed());
 

@@ -3,6 +3,18 @@ function normalizeTeamName(value) {
   return { display, normalized: display.toLowerCase() }
 }
 
+const teamChallengeIds = [
+  "problematicas-imagenes",
+  "transito-planta",
+  "sistemas-medicion",
+  "consumo-materiales",
+  "edificios-sustentables",
+]
+
+function isTeamChallengeId(value) {
+  return teamChallengeIds.includes(String(value || ""))
+}
+
 function requireUser(auth) {
   if (!auth || auth.collection().name !== "users" || !auth.getBool("enabled")) {
     throw new UnauthorizedError("Se requiere una sesión habilitada.")
@@ -123,7 +135,7 @@ function snapshot(record) {
   const name = record.collection().name
   const fieldsByCollection = {
     candidates: ["firstName", "lastName", "email", "emailNormalized", "ftcaStatus", "active"],
-    teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
+    teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount", "challenge"],
     team_memberships: ["team", "candidate", "source"],
     team_invitations: ["team", "candidate", "invitedBy", "status", "resolvedAt"],
     hackathon_settings: ["key", "deadlineUtc", "timezone", "formationOpen"],
@@ -171,6 +183,7 @@ module.exports = {
   cancelPendingInvitationsForCandidate,
   findMembershipByCandidate,
   getTeamMemberships,
+  isTeamChallengeId,
   normalizeTeamName,
   recalculateTeam,
   requireAdmin,

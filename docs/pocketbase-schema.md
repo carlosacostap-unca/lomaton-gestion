@@ -12,7 +12,7 @@ La definición vigente está en `tools/pocketbase-mcp/lomaton-schema.mjs` y se a
 - `mentor_invitations`: invitaciones privadas entre un equipo y un docente, con historial de resolución.
 - `team_mentorships`: asignación vigente separada de las membresías estudiantiles.
 - `admin_allowlist`: autorización administrativa.
-- `teams`, `team_memberships`, `team_invitations`: formación de equipos.
+- `teams`, `team_memberships`, `team_invitations`: formación de equipos; `teams.challenge` conserva opcionalmente uno de los cinco identificadores oficiales de desafío.
 - `hackathon_settings`: plazo, apertura, zona y `dataVersion`.
 - `import_batches`: resumen de importaciones.
 - `audit_logs`: trazabilidad inmutable.

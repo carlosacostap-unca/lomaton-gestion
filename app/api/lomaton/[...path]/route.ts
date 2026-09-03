@@ -16,8 +16,10 @@ import {
   disbandOwnTeam,
   inviteCandidate,
   resolveOwnInvitation,
+  updateTeamChallenge,
   withdrawInvitation,
 } from "@/lib/domain/team-commands";
+import { TEAM_CHALLENGE_IDS } from "@/lib/domain/team-challenges";
 import {
   assignAdminMentor,
   getOwnMentorDashboard,
@@ -61,6 +63,7 @@ type Context = { params: Promise<{ path: string[] }> };
 
 const teamSchema = z.object({ name: z.string() });
 const invitationSchema = z.object({ candidateId: z.string().min(1) });
+const teamChallengeSchema = z.object({ challengeId: z.enum(TEAM_CHALLENGE_IDS) }).strict();
 const settingsSchema = z.object({
   deadlineUtc: z.string(),
   formationOpen: z.boolean(),
@@ -223,6 +226,11 @@ export async function PATCH(request: Request, routeContext: Context) {
     if (path.length === 2 && path[0] === "me" && path[1] === "profile") {
       const { user, pb } = await context(request);
       return Response.json(await updateOwnProfile(pb, user, profileUpdateSchema.parse(await body(request))));
+    }
+    if (path.length === 3 && path[0] === "teams" && path[2] === "challenge") {
+      const { user, pb } = await context(request);
+      const input = teamChallengeSchema.parse(await body(request));
+      return Response.json(await updateTeamChallenge(pb, user, path[1], input.challengeId));
     }
     if (path.length === 3 && path[0] === "jury" && path[1] === "evaluations") {
       const { user, pb } = await juryContext(request);

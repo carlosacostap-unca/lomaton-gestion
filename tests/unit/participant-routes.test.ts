@@ -19,6 +19,7 @@ const getTeamDetail = vi.fn();
 const listStudents = vi.fn();
 const listTeachers = vi.fn();
 const getRegistration = vi.fn();
+const updateChallenge = vi.fn();
 
 vi.doMock("@/lib/pocketbase/server", () => ({
   requirePocketBaseUser: requireUser,
@@ -32,7 +33,7 @@ vi.doMock("@/lib/domain/mentor-commands", () => ({
   getTeamMentorState: getTeamMentor,
   removeAdminMentorship: vi.fn(),
 }));
-vi.doMock("@/lib/domain/team-commands", () => ({ createTeam: vi.fn(), disbandOwnTeam: vi.fn(), inviteCandidate: vi.fn(), resolveOwnInvitation: vi.fn(), withdrawInvitation: vi.fn() }));
+vi.doMock("@/lib/domain/team-commands", () => ({ createTeam: vi.fn(), disbandOwnTeam: vi.fn(), inviteCandidate: vi.fn(), resolveOwnInvitation: vi.fn(), updateTeamChallenge: updateChallenge, withdrawInvitation: vi.fn() }));
 vi.doMock("@/lib/domain/admin-commands", () => ({ addAdminTeamMember: vi.fn(), createAdminTeam: vi.fn(), disbandAdminTeam: vi.fn(), removeAdminTeamMember: vi.fn(), reconcileTeams: vi.fn(), resolveAdminInvitation: vi.fn(), updateAdminCandidate: vi.fn(), updateAdminTeam: vi.fn(), updateHackathonSettings: vi.fn() }));
 vi.doMock("@/lib/domain/registration-admin", () => ({ getAdminRegistration: getRegistration, listAdminRegistrations: vi.fn(), updateAdminRegistration: vi.fn() }));
 vi.doMock("@/lib/domain/admin-team-views", () => ({ listAdminTeamSummaries: listTeamViews, getAdminTeamDetail: getTeamDetail }));
@@ -62,6 +63,7 @@ describe("participant catch-all routes", () => {
     listStudents.mockResolvedValue({ students: [] });
     listTeachers.mockResolvedValue({ teachers: [], teams: [] });
     getRegistration.mockResolvedValue({ id: "registration1", fullName: "Ada" });
+    updateChallenge.mockResolvedValue({ teamId: "team1", challenge: { id: "transito-planta", title: "Tránsito por planta" } });
   });
 
   it("returns 401 for an unauthenticated own-profile request", async () => {
@@ -112,6 +114,26 @@ describe("participant catch-all routes", () => {
     );
     expect(legacyList.status).toBe(404);
     expect(assignMentor).not.toHaveBeenCalled();
+  });
+
+  it("validates and authenticates team challenge updates", async () => {
+    const response = await route.PATCH(new Request("https://app.test/api/lomaton/teams/team1/challenge", {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ challengeId: "transito-planta" }),
+    }), context(["teams", "team1", "challenge"]));
+    expect(response.status).toBe(200);
+    expect(updateChallenge).toHaveBeenCalledWith(service, user, "team1", "transito-planta");
+
+    const invalid = await route.PATCH(new Request("https://app.test/api/lomaton/teams/team1/challenge", {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ challengeId: "otro" }),
+    }), context(["teams", "team1", "challenge"]));
+    expect(invalid.status).toBe(400);
+    expect(updateChallenge).toHaveBeenCalledTimes(1);
+
+    requireUser.mockRejectedValueOnce(new ApiError(401, "Falta autenticación.", "authentication_required"));
+    const unauthenticated = await route.PATCH(new Request("https://app.test/api/lomaton/teams/team1/challenge", {
+      method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ challengeId: "transito-planta" }),
+    }), context(["teams", "team1", "challenge"]));
+    expect(unauthenticated.status).toBe(401);
   });
 
   it("assigns mentors only through the administrator route", async () => {

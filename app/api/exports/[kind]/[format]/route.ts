@@ -10,6 +10,7 @@ import {
 } from "@/lib/pocketbase/server";
 import { teamWarning, type ReportSnapshot, type SnapshotRecord } from "@/lib/report/hackathon";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
+import { teamChallengeTitle } from "@/lib/domain/team-challenges";
 import { readConsistentReportSnapshot } from "@/lib/report/snapshot";
 import { errorResponse } from "@/lib/server/api-error";
 
@@ -74,6 +75,7 @@ export async function GET(
       }
       rows = snapshot.teams.map((team) => ({
         equipo: String(team.name ?? ""),
+        desafio: teamChallengeTitle(team.challenge),
         estado: String(team.status ?? ""),
         integrantes: Number(team.memberCount ?? 0),
         ftca_confirmados: Number(team.ftcaConfirmedCount ?? 0),
@@ -86,7 +88,9 @@ export async function GET(
         advertencias: teamWarning(team),
       }));
       columns = [
-        { key: "equipo", header: "Equipo", width: 28 }, { key: "estado", header: "Estado" },
+        { key: "equipo", header: "Equipo", width: 28 },
+        { key: "desafio", header: "Desafío", width: 70 },
+        { key: "estado", header: "Estado" },
         { key: "integrantes", header: "Integrantes" }, { key: "ftca_confirmados", header: "FTCA confirmados" },
         { key: "miembros", header: "Miembros", width: 60 }, { key: "emails", header: "Emails", width: 60 },
         { key: "condiciones_ftca", header: "Condiciones FTCA", width: 40 },

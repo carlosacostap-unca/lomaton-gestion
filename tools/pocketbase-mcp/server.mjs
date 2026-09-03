@@ -23,6 +23,7 @@ import {
   studentCertificatesCollection,
   studentCertificateReviewFields,
   studentCertificateTimestampFields,
+  teamChallengeField,
   teamMentorshipsCollection,
 } from "./lomaton-schema.mjs";
 import {
@@ -269,6 +270,18 @@ const handlers = {
       );
       byName.set(created.name, created);
       actions.push("created:student_certificates");
+    }
+
+    const teamsForChallenges = byName.get("teams");
+    if (!teamsForChallenges) {
+      throw rpcError(-32020, "Falta teams antes de configurar el desafío.");
+    }
+    const teamFields = [...(teamsForChallenges.fields || [])];
+    if (!teamFields.some((field) => field.name === teamChallengeField.name)) {
+      teamFields.push(teamChallengeField);
+      const updated = await pb.collections.update(teamsForChallenges.id, { fields: teamFields });
+      byName.set("teams", updated);
+      actions.push("updated:teams_challenge");
     }
 
     const registrationsForProfiles = byName.get("registrations");

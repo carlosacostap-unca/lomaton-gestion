@@ -43,6 +43,32 @@ routerAdd("POST", "/api/lomaton/teams", (e) => {
   return e.json(201, domain.snapshot(e.app.findRecordById("teams", teamId)))
 }, $apis.requireAuth("users"))
 
+routerAdd("PATCH", "/api/lomaton/teams/{teamId}/challenge", (e) => {
+  const domain = require(`${__hooks}/lib/domain.cjs`)
+  const candidateId = domain.requireCandidate(e.auth)
+  const teamId = e.request.pathValue("teamId")
+  const data = new DynamicModel({ challengeId: "" })
+  e.bindBody(data)
+
+  if (!domain.isTeamChallengeId(data.challengeId)) {
+    throw new BadRequestError("El desafío seleccionado no es válido.")
+  }
+
+  e.app.runInTransaction((txApp) => {
+    const membership = domain.findMembershipByCandidate(txApp, candidateId)
+    if (!membership || membership.getString("team") !== teamId) {
+      throw new ForbiddenError(
+        "Solamente un integrante vigente puede seleccionar el desafío del equipo.",
+      )
+    }
+    const team = txApp.findRecordById("teams", teamId)
+    team.set("challenge", data.challengeId)
+    txApp.save(team)
+  })
+
+  return e.json(200, domain.snapshot(e.app.findRecordById("teams", teamId)))
+}, $apis.requireAuth("users"))
+
 routerAdd("DELETE", "/api/lomaton/teams/{teamId}", (e) => {
   const domain = require(`${__hooks}/lib/domain.cjs`)
   const candidateId = domain.requireCandidate(e.auth)

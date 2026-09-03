@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import PocketBase, { ClientResponseError, type RecordModel } from "pocketbase";
 
 import { normalizeTeamName, projectTeam } from "@/lib/domain/team-rules";
+import { getTeamChallenge, isTeamChallengeId } from "@/lib/domain/team-challenges";
 import { addAudit } from "@/lib/domain/admin-commands";
 import type { LomatonUser } from "@/lib/pocketbase/server";
 import { ApiError } from "@/lib/server/api-error";
@@ -158,6 +159,43 @@ export async function createTeam(pb: PocketBase, user: LomatonUser, name: string
   updateVersion(batch, currentSettings.id);
   await sendBatch(batch);
   return pb.collection("teams").getOne(teamId);
+}
+
+export async function updateTeamChallenge(
+  pb: PocketBase,
+  user: LomatonUser,
+  teamId: string,
+  challengeId: string,
+) {
+  const candidateId = requireCandidateId(user);
+  if (!isTeamChallengeId(challengeId)) {
+    throw new ApiError(400, "El desafío seleccionado no es válido.", "invalid_team_challenge");
+  }
+
+  const membership = await membershipByCandidate(pb, candidateId);
+  if (!membership || String(membership.team) !== teamId) {
+    throw new ApiError(
+      403,
+      "Solamente un integrante vigente puede seleccionar el desafío del equipo.",
+      "team_membership_required",
+    );
+  }
+
+  const [team, currentSettings] = await Promise.all([
+    pb.collection("teams").getOne(teamId).catch((error) => {
+      throw mapPocketBaseError(error, "El equipo no existe.");
+    }),
+    settings(pb),
+  ]);
+  const batch = pb.createBatch();
+  batch.collection("teams").update(team.id, { challenge: challengeId });
+  updateVersion(batch, currentSettings.id);
+  await sendBatch(batch);
+
+  return {
+    teamId: team.id,
+    challenge: getTeamChallenge(challengeId),
+  };
 }
 
 export async function disbandOwnTeam(pb: PocketBase, user: LomatonUser, teamId: string) {

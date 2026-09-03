@@ -116,6 +116,18 @@ migrate((app) => {
       },
       { type: "number", name: "memberCount", onlyInt: true, min: 0 },
       { type: "number", name: "ftcaConfirmedCount", onlyInt: true, min: 0 },
+      {
+        type: "select",
+        name: "challenge",
+        maxSelect: 1,
+        values: [
+          "problematicas-imagenes",
+          "transito-planta",
+          "sistemas-medicion",
+          "consumo-materiales",
+          "edificios-sustentables",
+        ],
+      },
       { type: "autodate", name: "created", onCreate: true, onUpdate: false },
       { type: "autodate", name: "updated", onCreate: true, onUpdate: true },
     ],

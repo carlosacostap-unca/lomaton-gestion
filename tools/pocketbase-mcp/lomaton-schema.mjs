@@ -28,7 +28,7 @@ export const expectedFields = {
   ],
   mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
-  teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount"],
+  teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount", "challenge"],
   team_memberships: ["team", "candidate", "source"],
   team_invitations: ["team", "candidate", "invitedBy", "status", "resolvedAt"],
   mentor_invitations: ["team", "mentor", "invitedBy", "status", "resolvedAt", "created", "updated"],
@@ -189,6 +189,20 @@ export const dataVersionField = {
   required: false,
   min: 0,
   onlyInt: true,
+};
+
+export const teamChallengeField = {
+  name: "challenge",
+  type: "select",
+  required: false,
+  maxSelect: 1,
+  values: [
+    "problematicas-imagenes",
+    "transito-planta",
+    "sistemas-medicion",
+    "consumo-materiales",
+    "edificios-sustentables",
+  ],
 };
 
 export function participantUserFields(registrationsCollectionId) {

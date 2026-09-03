@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getBrowserPocketBase } from "@/lib/pocketbase/client";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
+import { getTeamChallenge, TEAM_CHALLENGES } from "@/lib/domain/team-challenges";
 import { filterCandidateInviteOptions } from "@/lib/ui/invite-option-filter";
 import { StudentCertificateCard } from "./student-certificate-card";
 import { StudentEvaluationResult } from "./student-evaluation-result";
@@ -167,6 +168,44 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
               const candidate = membership.expand?.candidate;
               return <li key={membership.id}><span>{candidateName(candidate)}</span><small>{candidate?.ftcaStatus === "confirmed" ? "FTCA confirmado" : candidate?.ftcaStatus === "pending" ? "FTCA pendiente" : "No FTCA"}</small></li>;
             })}</ul>
+          </section>
+
+          <section className="panel" aria-labelledby="team-challenge-title">
+            <div className="section-heading">
+              <div>
+                <h2 id="team-challenge-title">Desafío del equipo</h2>
+                <p className="muted">
+                  {getTeamChallenge(state.team.challenge)?.title ?? "El equipo todavía no seleccionó un desafío."}
+                </p>
+              </div>
+            </div>
+            <form
+              key={`${state.team.id}-${String(state.team.challenge || "unselected")}`}
+              action={(formData) => command(
+                `/api/lomaton/teams/${state.team?.id}/challenge`,
+                "PATCH",
+                { challengeId: formData.get("challengeId") },
+                "Desafío del equipo actualizado.",
+              )}
+              className="upload-form"
+            >
+              <label htmlFor="team-challenge">Seleccionar un desafío</label>
+              <select
+                id="team-challenge"
+                name="challengeId"
+                defaultValue={getTeamChallenge(state.team.challenge)?.id ?? ""}
+                required
+                disabled={busy}
+              >
+                <option value="" disabled>Elegir desafío…</option>
+                {TEAM_CHALLENGES.map((challenge) => (
+                  <option key={challenge.id} value={challenge.id}>{challenge.title}</option>
+                ))}
+              </select>
+              <button className="primary-button" disabled={busy}>
+                {busy ? "Guardando…" : "Guardar desafío"}
+              </button>
+            </form>
           </section>
 
           {state.team.owner === candidateId ? (

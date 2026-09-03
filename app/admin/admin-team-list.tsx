@@ -72,7 +72,7 @@ export function AdminTeamList({ initialQuery = "", initialStatus = "" }: { initi
   const filteredTeams = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("es");
     return (data?.teams ?? []).filter((team) => {
-      const matchesText = !normalized || `${team.name} ${team.mentorName}`.toLocaleLowerCase("es").includes(normalized);
+      const matchesText = !normalized || `${team.name} ${team.mentorName} ${team.challenge?.title ?? "Sin seleccionar"}`.toLocaleLowerCase("es").includes(normalized);
       const matchesStatus = status === "all" || (status === "problematic" ? team.status !== "complete" : team.status === status);
       return matchesText && matchesStatus;
     });
@@ -128,6 +128,7 @@ export function AdminTeamList({ initialQuery = "", initialStatus = "" }: { initi
               <div><dt>Integrantes</dt><dd>{team.memberCount}</dd></div>
               <div><dt>FTCA</dt><dd>{team.ftcaConfirmedCount}</dd></div>
               <div><dt>Mentor</dt><dd>{team.mentorName || "Sin asignar"}</dd></div>
+              <div><dt>Desafío</dt><dd>{team.challenge?.title || "Sin seleccionar"}</dd></div>
             </dl>
             <p className={team.warning ? "team-warning" : "muted"}>{team.warning || "Sin alertas"}</p>
             <Link className="secondary-button link-button" href={`/admin/equipos/${team.id}${detailParams.size ? `?${detailParams}` : ""}`}>Ver y gestionar</Link>

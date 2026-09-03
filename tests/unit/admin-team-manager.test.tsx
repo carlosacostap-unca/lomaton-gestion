@@ -14,8 +14,8 @@ afterEach(cleanup);
 
 const list = {
   teams: [
-    { id: "team1", name: "Equipo Uno", status: "complete", memberCount: 3, ftcaConfirmedCount: 1, mentorName: "Docente Compartido", warning: "" },
-    { id: "team2", name: "Equipo Dos", status: "draft", memberCount: 1, ftcaConfirmedCount: 0, mentorName: "", warning: "Faltan 2 integrante(s)" },
+    { id: "team1", name: "Equipo Uno", status: "complete", memberCount: 3, ftcaConfirmedCount: 1, mentorName: "Docente Compartido", challenge: { id: "transito-planta", title: "Tránsito por planta" }, warning: "" },
+    { id: "team2", name: "Equipo Dos", status: "draft", memberCount: 1, ftcaConfirmedCount: 0, mentorName: "", challenge: null, warning: "Faltan 2 integrante(s)" },
   ],
   availableCandidates: [{ id: "candidate3", name: "Persona Disponible", email: "disponible@example.test", ftcaStatus: "pending" }],
 };
@@ -23,6 +23,7 @@ const list = {
 function detail(withMentor = false) {
   return {
     team: { id: "team2", name: "Equipo Dos", owner: "candidate2", status: "draft", memberCount: 1, ftcaConfirmedCount: 0 },
+    challenge: null,
     members: [{ id: "candidate2", name: "Responsable Dos", email: "dos@example.test", ftcaStatus: "confirmed" }],
     invitations: [],
     mentorship: withMentor ? { id: "mentorship1", mentorId: "mentor1", mentorName: "Docente Compartido", department: "FACEN" } : null,
@@ -44,6 +45,8 @@ describe("admin team list and detail", () => {
     render(<AdminTeamList />);
     expect(await screen.findByRole("heading", { name: "Equipo Uno" })).toBeTruthy();
     expect(screen.getAllByRole("link", { name: "Ver y gestionar" })).toHaveLength(2);
+    expect(screen.getByText("Tránsito por planta")).toBeTruthy();
+    expect(screen.getByText("Sin seleccionar")).toBeTruthy();
     expect(screen.queryByLabelText("Mentor de Equipo Uno")).toBeNull();
     await user.type(screen.getByLabelText("Buscar equipo o mentor"), "Dos");
     expect(screen.queryByRole("heading", { name: "Equipo Uno" })).toBeNull();
@@ -54,6 +57,8 @@ describe("admin team list and detail", () => {
   it("keeps a mentor available for assignment and refreshes the selected detail", async () => {
     api.mockImplementation((path: string) => path === "/api/lomaton/admin/teams/team2" ? Promise.resolve(detail(false)) : Promise.resolve({ ok: true }));
     render(<AdminTeamManager teamId="team2" />);
+    expect(await screen.findByText(/Desafío:/)).toBeTruthy();
+    expect(screen.getByText("Sin seleccionar")).toBeTruthy();
     const select = await screen.findByLabelText("Mentor de Equipo Dos") as HTMLSelectElement;
     expect(screen.getByRole("option", { name: /Docente Compartido/ })).toBeTruthy();
     fireEvent.change(select, { target: { value: "mentor1" } });

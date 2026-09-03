@@ -48,7 +48,7 @@ export function AdminTeamManager({ teamId, backHref = "/admin/equipos" }: { team
     return <section className="panel"><Link className="text-button" href={backHref}>← Volver a equipos</Link>{message ? <div className="alert" role="alert"><p>{message}</p><button className="secondary-button" type="button" onClick={() => void load()}>Reintentar</button></div> : <p className="muted" role="status">Cargando detalle del equipo…</p>}</section>;
   }
 
-  const { team, members, invitations, mentorship, availableCandidates, availableMentors } = detail;
+  const { team, challenge, members, invitations, mentorship, availableCandidates, availableMentors } = detail;
 
   return (
     <section className="panel" aria-labelledby="team-detail-title">
@@ -63,6 +63,7 @@ export function AdminTeamManager({ teamId, backHref = "/admin/equipos" }: { team
 
       <div className="team-detail-sections">
         <section aria-labelledby="team-general-title"><h3 id="team-general-title">Datos generales</h3>
+          <p><strong>Desafío:</strong> {challenge?.title || "Sin seleccionar"}</p>
           <form action={(formData) => command(`/api/lomaton/admin/teams/${teamId}`, "PATCH", { name: formData.get("name"), ownerCandidateId: formData.get("ownerCandidateId") }, "Equipo actualizado.")} className="edit-form">
             <label>Nombre<input name="name" defaultValue={String(team.name)} required minLength={2} maxLength={120} /></label>
             <label>Responsable<select name="ownerCandidateId" defaultValue={String(team.owner)}>{members.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</select></label>

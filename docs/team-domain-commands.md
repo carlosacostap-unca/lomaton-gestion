@@ -7,6 +7,7 @@ Las rutas `/api/lomaton/**` son Route Handlers de Next.js. Validan el token huma
 | Método | Ruta | Acción |
 | --- | --- | --- |
 | `POST` | `/api/lomaton/teams` | Crear equipo e incorporar al responsable |
+| `PATCH` | `/api/lomaton/teams/{teamId}/challenge` | Seleccionar o cambiar el desafío oficial como integrante vigente |
 | `DELETE` | `/api/lomaton/teams/{teamId}` | Disolver el equipo propio |
 | `POST` | `/api/lomaton/teams/{teamId}/invitations` | Invitar candidato |
 | `DELETE` | `/api/lomaton/invitations/{invitationId}` | Retirar invitación |
@@ -16,7 +17,7 @@ Las rutas `/api/lomaton/**` son Route Handlers de Next.js. Validan el token huma
 | `POST` | `/api/lomaton/certificates/me` | Cargar o reemplazar el PDF propio |
 | `GET` | `/api/lomaton/certificates/me/download` | Descargar el PDF propio mediante proxy privado |
 
-Los comandos exigen formación abierta y plazo vigente. Aceptar incorpora al candidato, resuelve esa invitación, cancela las restantes, recalcula el equipo e incrementa la versión en una transacción.
+Los comandos de formación exigen formación abierta y plazo vigente. La selección de desafío permanece disponible para los integrantes vigentes durante el hackatón y no altera la validez del equipo. Aceptar incorpora al candidato, resuelve esa invitación, cancela las restantes, recalcula el equipo e incrementa la versión en una transacción.
 
 ## Administración
 

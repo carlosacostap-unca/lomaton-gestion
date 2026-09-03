@@ -31,7 +31,7 @@ function fakePocketBase(seed: Record<string, Item[]>) {
 
 const seed: Record<string, Item[]> = {
   teams: [
-    { id: "team1", name: "Equipo Uno", owner: "candidate1", status: "complete", memberCount: 3, ftcaConfirmedCount: 1 },
+    { id: "team1", name: "Equipo Uno", owner: "candidate1", status: "complete", memberCount: 3, ftcaConfirmedCount: 1, challenge: "sistemas-medicion" },
     { id: "team2", name: "Equipo Dos", owner: "candidate3", status: "draft", memberCount: 1, ftcaConfirmedCount: 0 },
   ],
   team_memberships: [
@@ -64,7 +64,8 @@ describe("administrative team projections", () => {
     const result = await listAdminTeamSummaries(fakePocketBase(seed));
     expect(result.teams[0]).toEqual({
       id: "team1", name: "Equipo Uno", status: "complete", memberCount: 3,
-      ftcaConfirmedCount: 1, mentorName: "Docente Compartido", warning: "",
+      ftcaConfirmedCount: 1, mentorName: "Docente Compartido",
+      challenge: { id: "sistemas-medicion", title: "Mejoras en sistemas de medición" }, warning: "",
     });
     expect(result.availableCandidates.map((candidate) => candidate.id)).toEqual(["candidate2"]);
     expect(result.teams[0]).not.toHaveProperty("invitations");
@@ -73,9 +74,15 @@ describe("administrative team projections", () => {
   it("returns operations for one team without leaking another team's invitations", async () => {
     const result = await getAdminTeamDetail(fakePocketBase(seed), "team1");
     expect(result.team.id).toBe("team1");
+    expect(result.challenge?.title).toBe("Mejoras en sistemas de medición");
     expect(result.members.map((candidate) => candidate.id)).toEqual(["candidate1"]);
     expect(result.invitations).toEqual([{ id: "invite1", candidateId: "candidate2", candidateName: "Grace Disponible" }]);
     expect(result.availableCandidates.map((candidate) => candidate.id)).toEqual(["candidate2"]);
     expect(result.availableMentors).toEqual([{ id: "mentor1", name: "Docente Compartido", department: "FACEN" }]);
+  });
+
+  it("normalizes missing and unknown challenge values as unselected", async () => {
+    const result = await listAdminTeamSummaries(fakePocketBase(seed));
+    expect(result.teams[1].challenge).toBeNull();
   });
 });

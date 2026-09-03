@@ -27,6 +27,7 @@ async function seed() {
     { fullName: `Alma E2E ${suffix}`, email: `alma-${suffix}@test.invalid`, relationship: "student_ftca", relationshipSource: "Estudiante FTYCA", ftcaStatus: "confirmed", career: "Ingeniería en Informática" },
     { fullName: `Bruno E2E ${suffix}`, email: `bruno-${suffix}@test.invalid`, relationship: "student_external", relationshipSource: "Estudiante externo", ftcaStatus: "not_ftca", career: "Abogacía" },
     { fullName: `Clara E2E ${suffix}`, email: `clara-${suffix}@test.invalid`, relationship: "student_external", relationshipSource: "Estudiante externo", ftcaStatus: "not_ftca", career: "Licenciatura en Historia" },
+    { fullName: `Dante E2E ${suffix}`, email: `dante-${suffix}@test.invalid`, relationship: "student_external", relationshipSource: "Estudiante externo", ftcaStatus: "not_ftca", career: "Ingeniería Industrial" },
   ].map((row, index) => {
     const dni = String(90_000_000 + (Date.now() % 1_000_000) + index);
     const phone = `383499${String(index).padStart(4, "0")}`;
@@ -90,7 +91,7 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await owner.getByRole("button", { name: "Crear equipo" }).click();
   await expect(owner.getByText("Equipo creado.")).toBeVisible();
 
-  for (const invited of users.slice(1)) {
+  for (const invited of users.slice(1, 3)) {
     await owner.getByLabel("Buscar estudiante").fill(invited.email);
     await expect(owner.getByText("1 estudiante disponible.")).toBeVisible();
     await owner.getByLabel("Estudiante disponible").selectOption(invited.candidateId);
@@ -110,6 +111,29 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await expect(owner.getByText(teamName)).toBeVisible();
   await expect(owner.getByText("complete")).toBeVisible();
   await expect(owner.getByText("3/4 integrantes")).toBeVisible();
+  await owner.getByLabel("Seleccionar un desafío").selectOption("transito-planta");
+  await owner.getByRole("button", { name: "Guardar desafío" }).click();
+  await expect(owner.getByText("Desafío del equipo actualizado.")).toBeVisible();
+
+  const memberContext = await browser.newContext();
+  await authenticate(memberContext, { token: users[1].token, record: users[1].record });
+  const member = await memberContext.newPage();
+  await member.goto("/candidate");
+  await expect(member.getByLabel("Seleccionar un desafío")).toHaveValue("transito-planta");
+  await member.getByLabel("Seleccionar un desafío").selectOption("edificios-sustentables");
+  await member.getByRole("button", { name: "Guardar desafío" }).click();
+  await expect(member.getByText("Desafío del equipo actualizado.")).toBeVisible();
+  await owner.reload();
+  await expect(owner.getByLabel("Seleccionar un desafío")).toHaveValue("edificios-sustentables");
+  await memberContext.close();
+
+  const challengeSnapshot = await json(await fetch(`${appUrl}/api/lomaton/admin/report-snapshot`, { headers: { Authorization: adminAuth.token } }));
+  const challengeTeam = challengeSnapshot.teams.find((item: Record<string, unknown>) => item.name === teamName);
+  expect(challengeTeam).toBeTruthy();
+  const outsider = await request.patch(`${appUrl}/api/lomaton/teams/${String(challengeTeam.id)}/challenge`, {
+    headers: { Authorization: users[3].token }, data: { challengeId: "sistemas-medicion" },
+  });
+  expect(outsider.status()).toBe(403);
   const duplicate = await request.post(`${appUrl}/api/lomaton/teams`, {
     headers: { Authorization: users[1].token }, data: { name: `Segundo ${teamName}` },
   });
@@ -123,8 +147,10 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   const adminContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await authenticate(adminContext, adminAuth);
   const adminPage = await adminContext.newPage();
-  await adminPage.goto("/admin");
-  await expect(adminPage.getByRole("heading", { name: "Panel del Lomatón" })).toBeVisible();
+  await adminPage.goto("/admin/equipos");
+  await expect(adminPage.getByRole("heading", { name: "Equipos" })).toBeVisible();
+  const teamCard = adminPage.getByRole("heading", { name: teamName }).locator("xpath=ancestor::article");
+  await expect(teamCard.getByText("Edificios sustentables y mejora de espacios")).toBeVisible();
   const adminNavigation = adminPage.getByRole("navigation", { name: "Secciones de administración" });
   await expect(adminNavigation.getByRole("link")).toHaveCount(6);
   await adminNavigation.getByRole("link", { name: "Configuración" }).click();

@@ -117,6 +117,15 @@ describe("participant portal components", () => {
 
     render(<CandidateDashboard candidateId={owner.id} />);
     const search = await screen.findByLabelText("Buscar estudiante");
+    const challenge = screen.getByLabelText("Seleccionar un desafío") as HTMLSelectElement;
+    expect(challenge.options).toHaveLength(6);
+    fireEvent.change(challenge, { target: { value: "edificios-sustentables" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar desafío" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith(
+      "/api/lomaton/teams/team1/challenge",
+      { method: "PATCH", body: { challengeId: "edificios-sustentables" } },
+    ));
+    expect(await screen.findByText("Desafío del equipo actualizado.")).toBeTruthy();
     const select = screen.getByLabelText("Estudiante disponible") as HTMLSelectElement;
     const invite = screen.getAllByRole("button", { name: "Invitar" })[0] as HTMLButtonElement;
 
@@ -134,6 +143,37 @@ describe("participant portal components", () => {
     fireEvent.change(search, { target: { value: "sin coincidencias" } });
     expect(await screen.findByText("No hay estudiantes que coincidan con la búsqueda.")).toBeTruthy();
     expect(select.disabled).toBe(true);
+  });
+
+  it("lets any current member retry a failed challenge update", async () => {
+    const candidate = { id: "candidate2", fullName: "Integrante Dos", email: "member@example.test", ftcaStatus: "not_ftca" };
+    const membership = { id: "membership2", candidate: candidate.id, team: "team1", expand: { candidate } };
+    const collections = {
+      hackathon_settings: { getFirstListItem: vi.fn().mockResolvedValue({ formationOpen: false, deadlineUtc: "2030-12-31T23:59:59.000Z" }) },
+      team_memberships: {
+        getFirstListItem: vi.fn().mockResolvedValue(membership),
+        getFullList: vi.fn((options?: { expand?: string }) => Promise.resolve(options?.expand ? [membership] : [membership])),
+      },
+      team_invitations: { getFullList: vi.fn().mockResolvedValue([]) },
+      teams: { getOne: vi.fn().mockResolvedValue({ id: "team1", owner: "candidate1", name: "Equipo Norte", status: "draft" }) },
+      candidates: { getFullList: vi.fn().mockResolvedValue([candidate]) },
+    };
+    getBrowserPocketBase.mockReturnValue({
+      collection: (name: keyof typeof collections) => collections[name],
+      filter: (expression: string) => expression,
+    });
+    api.mockRejectedValueOnce(new Error("No se pudo guardar el desafío.")).mockResolvedValueOnce({ ok: true });
+
+    render(<CandidateDashboard candidateId={candidate.id} />);
+    const select = await screen.findByLabelText("Seleccionar un desafío");
+    fireEvent.change(select, { target: { value: "sistemas-medicion" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar desafío" }));
+    expect(await screen.findByText("No se pudo guardar el desafío.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Guardar desafío" }) as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar desafío" }));
+    expect(await screen.findByText("Desafío del equipo actualizado.")).toBeTruthy();
+    expect(api.mock.calls.filter(([path]) => path === "/api/lomaton/teams/team1/challenge")).toHaveLength(2);
   });
 
   it("keeps primary controls reachable by keyboard", async () => {

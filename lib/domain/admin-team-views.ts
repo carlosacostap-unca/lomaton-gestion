@@ -3,6 +3,7 @@ import "server-only";
 import type PocketBase from "pocketbase";
 
 import { candidateDisplayName } from "@/lib/domain/candidate-name";
+import { getTeamChallenge, type TeamChallenge } from "@/lib/domain/team-challenges";
 import { teamWarning } from "@/lib/report/hackathon";
 
 type RecordItem = Record<string, unknown> & { id: string };
@@ -27,6 +28,7 @@ export type AdminTeamSummary = {
   memberCount: number;
   ftcaConfirmedCount: number;
   mentorName: string;
+  challenge: TeamChallenge | null;
   warning: string;
 };
 
@@ -37,6 +39,7 @@ export type AdminTeamListView = {
 
 export type AdminTeamDetailView = {
   team: RecordItem;
+  challenge: TeamChallenge | null;
   members: AdminCandidateOption[];
   invitations: Array<{ id: string; candidateId: string; candidateName: string }>;
   mentorship: { id: string; mentorId: string; mentorName: string; department: string } | null;
@@ -91,6 +94,7 @@ export async function listAdminTeamSummaries(pb: PocketBase): Promise<AdminTeamL
         memberCount: Number(team.memberCount || 0),
         ftcaConfirmedCount: Number(team.ftcaConfirmedCount || 0),
         mentorName: mentor?.name || "",
+        challenge: getTeamChallenge(team.challenge),
         warning: teamWarning(team),
       };
     }),
@@ -119,6 +123,7 @@ export async function getAdminTeamDetail(pb: PocketBase, teamId: string): Promis
 
   return {
     team,
+    challenge: getTeamChallenge(team.challenge),
     members: teamMemberships.flatMap((membership) => {
       const candidate = candidatesById.get(String(membership.candidate));
       return candidate ? [candidateOption(candidate)] : [];
