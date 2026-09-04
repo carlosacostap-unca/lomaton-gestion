@@ -11,6 +11,7 @@ import { filterCandidateInviteOptions } from "@/lib/ui/invite-option-filter";
 import { StudentCertificateCard } from "./student-certificate-card";
 import { StudentEvaluationResult } from "./student-evaluation-result";
 import { TeamMentorCard } from "@/app/portal/team-mentor-card";
+import { TeamDeliverableCard } from "./team-deliverable-card";
 
 type CandidateState = {
   settings: RecordModel;
@@ -207,6 +208,8 @@ export function CandidateDashboard({ candidateId }: { candidateId: string }) {
               </button>
             </form>
           </section>
+
+          <TeamDeliverableCard />
 
           {state.team.owner === candidateId ? (
             <>

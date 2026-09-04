@@ -8,6 +8,7 @@ import { useAuth } from "@/app/components/auth-provider";
 export const adminDestinations = [
   { href: "/admin", label: "Resumen", exact: true },
   { href: "/admin/equipos", label: "Equipos" },
+  { href: "/admin/entregas", label: "Entregas" },
   { href: "/admin/certificados", label: "Certificados" },
   { href: "/admin/estudiantes", label: "Estudiantes" },
   { href: "/admin/docentes", label: "Docentes" },

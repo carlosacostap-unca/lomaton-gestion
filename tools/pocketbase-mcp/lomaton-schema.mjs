@@ -26,6 +26,14 @@ export const expectedFields = {
     "candidate", "certificate", "originalName", "sizeBytes", "sha256", "uploadedBy",
     "reviewStatus", "reviewedBy", "reviewedAt", "rejectionReason", "created", "updated",
   ],
+  team_deliverables: [
+    "team", "status", "version",
+    "presentationMedium", "presentationFile", "presentationUrl", "presentationOriginalName", "presentationSizeBytes", "presentationMimeType", "presentationSha256", "presentationUpdatedAt",
+    "canvasFile", "canvasOriginalName", "canvasSizeBytes", "canvasMimeType", "canvasSha256", "canvasUpdatedAt",
+    "reportFile", "reportOriginalName", "reportSizeBytes", "reportMimeType", "reportSha256", "reportUpdatedAt",
+    "evidenceMedium", "evidenceFile", "evidenceUrl", "evidenceOriginalName", "evidenceSizeBytes", "evidenceMimeType", "evidenceSha256", "evidenceUpdatedAt",
+    "videoUrl", "videoUpdatedAt", "finalizedBy", "finalizedAt", "created", "updated",
+  ],
   mentor_profiles: ["registration", "department", "externalDescription", "mentorInterest", "active"],
   admin_allowlist: ["email", "emailNormalized", "active"],
   teams: ["name", "nameNormalized", "owner", "status", "memberCount", "ftcaConfirmedCount", "challenge"],
@@ -33,13 +41,13 @@ export const expectedFields = {
   team_invitations: ["team", "candidate", "invitedBy", "status", "resolvedAt"],
   mentor_invitations: ["team", "mentor", "invitedBy", "status", "resolvedAt", "created", "updated"],
   team_mentorships: ["team", "mentor", "source", "created", "updated"],
-  hackathon_settings: ["key", "deadlineUtc", "timezone", "formationOpen", "dataVersion"],
+  hackathon_settings: ["key", "deadlineUtc", "deliverablesDeadlineUtc", "timezone", "formationOpen", "dataVersion"],
   import_batches: ["fileName", "fileType", "totalRows", "validRows", "invalidRows", "pendingFtcaRows", "createdBy"],
   audit_logs: ["actor", "action", "entityType", "entityId", "before", "after", "reason", "metadata"],
   jurors: ["fullName", "email", "emailNormalized", "active", "created", "updated"],
-  evaluation_cycles: ["status", "criteriaVersion", "jurorCount", "teamCount", "requiredCount", "finalizedCount", "version", "openedBy", "openedAt", "cancelledBy", "cancelledAt", "cancelReason", "publishedBy", "publishedAt", "created", "updated"],
-  jury_evaluations: ["cycle", "juror", "team", "jurorNameSnapshot", "teamNameSnapshot", "status", "completedCriteria", "scoreInnovation", "scoreImpact", "scoreViability", "scorePresentation", "scoreTeamwork", "totalCentipoints", "version", "finalizedAt", "created", "updated"],
-  evaluation_results: ["cycle", "team", "teamNameSnapshot", "jurorCount", "innovationSum", "impactSum", "viabilitySum", "presentationSum", "teamworkSum", "totalCentipointsSum", "publishedAt", "created", "updated"],
+  evaluation_cycles: ["status", "criteriaVersion", "criteriaSnapshot", "jurorCount", "teamCount", "requiredCount", "finalizedCount", "version", "openedBy", "openedAt", "cancelledBy", "cancelledAt", "cancelReason", "publishedBy", "publishedAt", "created", "updated"],
+  jury_evaluations: ["cycle", "juror", "team", "jurorNameSnapshot", "teamNameSnapshot", "status", "completedCriteria", "scoreInnovation", "scoreImpact", "scoreViability", "scorePresentation", "scoreTeamwork", "totalCentipoints", "aspectScores", "aspectObservations", "totalNumerator", "totalDenominator", "version", "finalizedAt", "created", "updated"],
+  evaluation_results: ["cycle", "team", "teamNameSnapshot", "jurorCount", "innovationSum", "impactSum", "viabilitySum", "presentationSum", "teamworkSum", "totalCentipointsSum", "criterionAspectScoreSums", "totalNumeratorSum", "totalDenominator", "publishedAt", "created", "updated"],
 };
 
 const userReadRule =
@@ -89,6 +97,13 @@ export const collectionRulePatches = {
     viewRule: technicalRule,
     createRule: technicalRule,
     updateRule: `${technicalRule} && (@request.query.expected_sha256 = "" || sha256 = @request.query.expected_sha256)`,
+    deleteRule: technicalRule,
+  },
+  team_deliverables: {
+    listRule: technicalRule,
+    viewRule: technicalRule,
+    createRule: technicalRule,
+    updateRule: `${technicalRule} && (@request.query.expected_version = "" || version = @request.query.expected_version)`,
     deleteRule: technicalRule,
   },
   mentor_profiles: {
@@ -496,9 +511,67 @@ export function studentCertificatesCollection(candidatesCollectionId, usersColle
   };
 }
 
+export const deliverableStructuralMaxBytes = 25 * 1024 * 1024;
+
+export const deliverablesDeadlineField = {
+  name: "deliverablesDeadlineUtc",
+  type: "date",
+  required: false,
+};
+
+function deliverableFileFields(prefix, mimeTypes) {
+  return [
+    {
+      name: `${prefix}File`,
+      type: "file",
+      required: false,
+      maxSelect: 1,
+      maxSize: deliverableStructuralMaxBytes,
+      mimeTypes,
+      protected: true,
+    },
+    { name: `${prefix}OriginalName`, type: "text", required: false, max: 240 },
+    { name: `${prefix}SizeBytes`, type: "number", required: false, min: 0, max: deliverableStructuralMaxBytes, onlyInt: true },
+    { name: `${prefix}MimeType`, type: "text", required: false, max: 160 },
+    { name: `${prefix}Sha256`, type: "text", required: false, max: 64, pattern: "^$|^[a-f0-9]{64}$" },
+    { name: `${prefix}UpdatedAt`, type: "date", required: false },
+  ];
+}
+
+export function teamDeliverablesCollection(teamsCollectionId, usersCollectionId) {
+  return {
+    name: "team_deliverables",
+    type: "base",
+    ...collectionRulePatches.team_deliverables,
+    fields: [
+      { name: "team", type: "relation", required: true, collectionId: teamsCollectionId, maxSelect: 1, cascadeDelete: true },
+      { name: "status", type: "select", required: true, maxSelect: 1, values: ["draft", "finalized"] },
+      { name: "version", type: "number", required: true, min: 1, onlyInt: true },
+      { name: "presentationMedium", type: "select", required: false, maxSelect: 1, values: ["file", "link"] },
+      ...deliverableFileFields("presentation", ["application/pdf", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]),
+      { name: "presentationUrl", type: "text", required: false, max: 2048 },
+      ...deliverableFileFields("canvas", ["application/pdf", "image/png", "image/jpeg"]),
+      ...deliverableFileFields("report", ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]),
+      { name: "evidenceMedium", type: "select", required: false, maxSelect: 1, values: ["file", "link"] },
+      ...deliverableFileFields("evidence", ["application/pdf", "image/png", "image/jpeg", "application/zip"]),
+      { name: "evidenceUrl", type: "text", required: false, max: 2048 },
+      { name: "videoUrl", type: "text", required: false, max: 2048 },
+      { name: "videoUpdatedAt", type: "date", required: false },
+      { name: "finalizedBy", type: "relation", required: false, collectionId: usersCollectionId, maxSelect: 1, cascadeDelete: false },
+      { name: "finalizedAt", type: "date", required: false },
+      { name: "created", type: "autodate", onCreate: true, onUpdate: false },
+      { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+    ],
+    indexes: [
+      "CREATE UNIQUE INDEX idx_team_deliverables_team ON team_deliverables (team)",
+      "CREATE INDEX idx_team_deliverables_status ON team_deliverables (status)",
+    ],
+  };
+}
+
 export const batchSettings = {
   enabled: true,
   maxRequests: 11_000,
   timeout: 60,
-  maxBodySize: 16 * 1024 * 1024,
+  maxBodySize: 30 * 1024 * 1024,
 };

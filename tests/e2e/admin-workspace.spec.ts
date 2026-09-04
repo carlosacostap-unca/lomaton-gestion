@@ -112,6 +112,19 @@ async function installAdminSession(page: Page) {
     contentType: "application/json",
     body: JSON.stringify(teacherDirectory()),
   }));
+  const delivery = {
+    teamId: "team0000000001", teamName: "Equipo Uno", lifecycle: "draft", summaryStatus: "draft_incomplete", version: 2,
+    deadlineUtc: "2030-12-31T23:59:00.000Z", canEdit: false, missingRequired: ["report"], updatedAt: "2026-09-03T12:00:00.000Z", finalizedAt: "",
+    products: [
+      { kind: "presentation", label: "Presentación", required: true, allowedMedia: ["file", "link"], allowedExtensions: ["pdf", "ppt", "pptx"], medium: "link", url: "https://example.test/deck" },
+      { kind: "canvas", label: "Canvas", required: true, allowedMedia: ["file"], allowedExtensions: ["pdf", "png", "jpg", "jpeg"], medium: "file", originalName: "canvas.pdf", sizeBytes: 1200, mimeType: "application/pdf", downloadPath: "/api/lomaton/deliverables/team0000000001/files/canvas" },
+      { kind: "report", label: "Informe", required: true, allowedMedia: ["file"], allowedExtensions: ["pdf", "doc", "docx"], medium: "none" },
+      { kind: "evidence", label: "Evidencia del desarrollo alcanzado", required: true, allowedMedia: ["file", "link"], allowedExtensions: ["pdf", "png", "jpg", "jpeg", "zip"], medium: "link", url: "https://example.test/evidence" },
+      { kind: "video", label: "Video", required: false, allowedMedia: ["link"], allowedExtensions: [], medium: "none" },
+    ],
+  };
+  await page.route("**/api/lomaton/admin/deliverables", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ deadlineUtc: delivery.deadlineUtc, items: [delivery], counts: { none: 0, draft_incomplete: 1, draft_complete: 0, finalized: 0 } }) }));
+  await page.route("**/api/lomaton/admin/deliverables/team0000000001", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(delivery) }));
   await page.route("**/api/lomaton/admin/teams/*/mentor", async (route) => {
     const teamId = route.request().url().split("/").at(-2) || "";
     const body = route.request().postDataJSON() as { mentorId: string };
@@ -137,11 +150,22 @@ test("admin navigates sections, previews a certificate, and manages one team", a
   await page.goto("/admin");
 
   const navigation = page.getByRole("navigation", { name: "Secciones de administración" });
-  await expect(navigation.getByRole("link")).toHaveCount(9);
+  await expect(navigation.getByRole("link")).toHaveCount(10);
   await expect(navigation).not.toContainText("Reportes");
   await expect(navigation).not.toContainText("Auditoría");
   await expect(navigation).not.toContainText("Personas");
   await expect(navigation.getByRole("link", { name: "Resumen" })).toHaveAttribute("aria-current", "page");
+
+  await navigation.getByRole("link", { name: "Entregas" }).click();
+  await expect(page).toHaveURL(/\/admin\/entregas$/);
+  await expect(page.getByText("Equipo Uno")).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Entregas" })).toHaveAttribute("aria-current", "page");
+  await page.getByRole("link", { name: "Ver detalle" }).click();
+  await expect(page).toHaveURL(/\/admin\/entregas\/team0000000001$/);
+  await expect(page.getByRole("heading", { name: "Presentación" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /guardar|retirar|finalizar/i })).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/admin\/entregas$/);
 
   await navigation.getByRole("link", { name: "Estudiantes" }).click();
   await expect(page).toHaveURL(/\/admin\/estudiantes$/);

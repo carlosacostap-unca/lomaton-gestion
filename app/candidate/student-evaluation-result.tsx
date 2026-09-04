@@ -2,17 +2,37 @@
 
 import { useEffect, useState } from "react";
 
-import { JURY_CRITERIA, type CriterionKey } from "@/lib/jury-evaluation-contract";
+import {
+  JURY_CRITERIA,
+  JURY_PLANILLA_CRITERIA,
+  JURY_SCORE_SCALE,
+  LEGACY_JURY_CRITERIA_VERSION,
+  PLANILLA_JURY_CRITERIA_VERSION,
+  type CriterionKey,
+} from "@/lib/jury-evaluation-contract";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 
 type Result =
   | { published: false; teamId: string | null }
   | {
       published: true;
+      criteriaVersion: typeof LEGACY_JURY_CRITERIA_VERSION;
+      mode: "v1";
       teamId: string;
       teamName: string;
       jurorCount: number;
       scores: Record<CriterionKey, number>;
+      total: number;
+      publishedAt: string;
+    }
+  | {
+      published: true;
+      criteriaVersion: typeof PLANILLA_JURY_CRITERIA_VERSION;
+      mode: "v2";
+      teamId: string;
+      teamName: string;
+      jurorCount: number;
+      criterionAverages: Record<CriterionKey, number>;
       total: number;
       publishedAt: string;
     };
@@ -43,13 +63,22 @@ export function StudentEvaluationResult() {
   return (
     <section className="panel evaluation-result-card">
       <p className="eyebrow">Resultado publicado</p>
-      <div className="section-heading"><h2>{result.teamName}</h2><strong className="evaluation-result-total">{result.total.toFixed(2)} / 10</strong></div>
+      <div className="section-heading"><h2>{result.teamName}</h2><strong className="evaluation-result-total">{result.total.toFixed(2)} / {result.mode === "v2" ? "100" : "10"}</strong></div>
       <p className="muted">Promedio consolidado de {result.jurorCount} evaluadores.</p>
       <dl className="evaluation-result-grid">
-        {JURY_CRITERIA.map((criterion) => (
-          <div key={criterion.key}><dt>{criterion.label} ({criterion.weight}%)</dt><dd>{result.scores[criterion.key].toFixed(2)}</dd></div>
-        ))}
+        {result.mode === "v2"
+          ? JURY_PLANILLA_CRITERIA.map((criterion) => (
+              <div key={criterion.key}><dt>{criterion.label} ({criterion.weight}%)</dt><dd>{result.criterionAverages[criterion.key].toFixed(2)} / 5</dd></div>
+            ))
+          : JURY_CRITERIA.map((criterion) => (
+              <div key={criterion.key}><dt>{criterion.label} ({criterion.weight}%)</dt><dd>{result.scores[criterion.key].toFixed(2)} / 10</dd></div>
+            ))}
       </dl>
+      {result.mode === "v2" ? (
+        <p className="evaluation-result-scale">
+          Escala: {JURY_SCORE_SCALE.map((item) => `${item.value} = ${item.label}`).join(" · ")}
+        </p>
+      ) : <p className="muted">Resultado histórico en la escala original 0–10.</p>}
     </section>
   );
 }

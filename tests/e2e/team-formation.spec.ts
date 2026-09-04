@@ -68,7 +68,7 @@ async function seed() {
     seeded.push({ id: String(user.id), candidateId: String(candidate.id), email: row.email, token: String(token.token), record });
   }
   await json(await fetch(`${appUrl}/api/lomaton/admin/settings`, {
-    method: "PATCH", headers: { Authorization: adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ deadlineUtc: "2030-12-31T23:59:00.000Z", formationOpen: true, reason: "habilitar E2E" }),
+    method: "PATCH", headers: { Authorization: adminToken, "Content-Type": "application/json" }, body: JSON.stringify({ deadlineUtc: "2030-12-31T23:59:00.000Z", deliverablesDeadlineUtc: "2030-12-31T23:59:00.000Z", formationOpen: true, reason: "habilitar E2E" }),
   }));
   return { users: seeded, teamName: `Equipo E2E ${suffix}`, adminAuth: { token: adminToken, record: admin as Record<string, unknown> } };
 }
@@ -127,6 +127,57 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   await expect(owner.getByLabel("Seleccionar un desafío")).toHaveValue("edificios-sustentables");
   await memberContext.close();
 
+  let delivery = await json(await fetch(`${appUrl}/api/lomaton/me/deliverable`, { headers: { Authorization: users[0].token } }));
+  expect(delivery.version).toBe(0);
+  const saveLink = async (token: string, kind: string, url: string, expectedVersion: number) => json(await fetch(`${appUrl}/api/lomaton/me/deliverable/products/${kind}`, {
+    method: "PATCH", headers: { Authorization: token, "Content-Type": "application/json" }, body: JSON.stringify({ expectedVersion, url }),
+  }));
+  const savePdf = async (token: string, kind: string, expectedVersion: number) => {
+    const form = new FormData();
+    form.set("expectedVersion", String(expectedVersion));
+    form.set("file", new File([Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF")], `${kind}.pdf`, { type: "application/pdf" }));
+    return json(await fetch(`${appUrl}/api/lomaton/me/deliverable/products/${kind}`, { method: "PATCH", headers: { Authorization: token }, body: form }));
+  };
+  delivery = await saveLink(users[0].token, "presentation", "https://example.test/presentacion", delivery.version);
+  const stale = await request.patch(`${appUrl}/api/lomaton/me/deliverable/products/evidence`, { headers: { Authorization: users[1].token }, data: { expectedVersion: 0, url: "https://example.test/evidencia" } });
+  expect(stale.status()).toBe(409);
+  const unsafe = await request.patch(`${appUrl}/api/lomaton/me/deliverable/products/evidence`, { headers: { Authorization: users[0].token }, data: { expectedVersion: delivery.version, url: "http://127.0.0.1/private" } });
+  expect(unsafe.status()).toBe(400);
+  delivery = await savePdf(users[1].token, "canvas", delivery.version);
+  delivery = await savePdf(users[0].token, "report", delivery.version);
+  delivery = await saveLink(users[1].token, "evidence", "https://example.test/evidencia", delivery.version);
+  delivery = await saveLink(users[0].token, "video", "https://example.test/video", delivery.version);
+  delivery = await savePdf(users[1].token, "presentation", delivery.version);
+  expect(delivery.products.find((item: Record<string, unknown>) => item.kind === "presentation").medium).toBe("file");
+  delivery = await savePdf(users[0].token, "evidence", delivery.version);
+  const disguised = new FormData();
+  disguised.set("expectedVersion", String(delivery.version));
+  disguised.set("file", new File([Buffer.from("MZ executable")], "canvas.pdf", { type: "application/pdf" }));
+  const disguisedResponse = await fetch(`${appUrl}/api/lomaton/me/deliverable/products/canvas`, { method: "PATCH", headers: { Authorization: users[0].token }, body: disguised });
+  expect(disguisedResponse.status).toBe(400);
+  const oversized = await request.patch(`${appUrl}/api/lomaton/me/deliverable/products/canvas`, { headers: { Authorization: users[0].token, "content-type": "multipart/form-data; boundary=x", "content-length": String(26 * 1024 * 1024 + 1) }, data: "--x--" });
+  expect(oversized.status()).toBe(413);
+  delivery = await json(await fetch(`${appUrl}/api/lomaton/me/deliverable/finalize`, { method: "POST", headers: { Authorization: users[0].token, "Content-Type": "application/json" }, body: JSON.stringify({ expectedVersion: delivery.version }) }));
+  expect(delivery.lifecycle).toBe("finalized");
+  delivery = await saveLink(users[1].token, "video", "https://example.test/video-v2", delivery.version);
+  expect(delivery.lifecycle).toBe("draft");
+  delivery = await json(await fetch(`${appUrl}/api/lomaton/me/deliverable/finalize`, { method: "POST", headers: { Authorization: users[1].token, "Content-Type": "application/json" }, body: JSON.stringify({ expectedVersion: delivery.version }) }));
+  expect(delivery.lifecycle).toBe("finalized");
+  expect(JSON.stringify(delivery)).not.toMatch(/sha256|pb-lomaton|token=/i);
+
+  const adminDeliveries = await json(await fetch(`${appUrl}/api/lomaton/admin/deliverables`, { headers: { Authorization: adminAuth.token } }));
+  const supervised = adminDeliveries.items.find((item: Record<string, unknown>) => item.teamName === teamName);
+  expect(supervised.summaryStatus).toBe("finalized");
+  const outsiderDownload = await request.get(`${appUrl}${delivery.products.find((item: Record<string, unknown>) => item.kind === "canvas").downloadPath}`, { headers: { Authorization: users[3].token } });
+  expect(outsiderDownload.status()).toBe(403);
+  const adminMutation = await request.patch(`${appUrl}/api/lomaton/admin/deliverables/${delivery.teamId}`, { headers: { Authorization: adminAuth.token }, data: { status: "draft" } });
+  expect(adminMutation.status()).toBe(404);
+
+  await json(await fetch(`${appUrl}/api/lomaton/admin/settings`, { method: "PATCH", headers: { Authorization: adminAuth.token, "Content-Type": "application/json" }, body: JSON.stringify({ deadlineUtc: "2030-12-31T23:59:00.000Z", deliverablesDeadlineUtc: "2020-01-01T00:00:00.000Z", formationOpen: true, reason: "probar cierre E2E", confirmImmediateDeliverablesClosure: true }) }));
+  const closedMutation = await request.patch(`${appUrl}/api/lomaton/me/deliverable/products/video`, { headers: { Authorization: users[0].token }, data: { expectedVersion: delivery.version, url: "https://example.test/late" } });
+  expect(closedMutation.status()).toBe(409);
+  await json(await fetch(`${appUrl}/api/lomaton/admin/settings`, { method: "PATCH", headers: { Authorization: adminAuth.token, "Content-Type": "application/json" }, body: JSON.stringify({ deadlineUtc: "2030-12-31T23:59:00.000Z", deliverablesDeadlineUtc: "2030-12-31T23:59:00.000Z", formationOpen: true, reason: "restaurar plazo E2E" }) }));
+
   const challengeSnapshot = await json(await fetch(`${appUrl}/api/lomaton/admin/report-snapshot`, { headers: { Authorization: adminAuth.token } }));
   const challengeTeam = challengeSnapshot.teams.find((item: Record<string, unknown>) => item.name === teamName);
   expect(challengeTeam).toBeTruthy();
@@ -152,9 +203,9 @@ test("varios candidatos forman un equipo válido y no pueden duplicar membresía
   const teamCard = adminPage.getByRole("heading", { name: teamName }).locator("xpath=ancestor::article");
   await expect(teamCard.getByText("Edificios sustentables y mejora de espacios")).toBeVisible();
   const adminNavigation = adminPage.getByRole("navigation", { name: "Secciones de administración" });
-  await expect(adminNavigation.getByRole("link")).toHaveCount(6);
+  await expect(adminNavigation.getByRole("link")).toHaveCount(10);
   await adminNavigation.getByRole("link", { name: "Configuración" }).click();
-  await expect(adminPage.getByLabel("Fecha y hora límite (Argentina)")).toBeVisible();
+  await expect(adminPage.getByLabel("Fecha y hora límite de entregas (Argentina)")).toBeVisible();
   expect(await adminPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await adminContext.close();
 

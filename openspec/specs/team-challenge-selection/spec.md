@@ -1,4 +1,10 @@
-## ADDED Requirements
+# team-challenge-selection Specification
+
+## Purpose
+
+Permitir que cada equipo elija un único desafío oficial del hackatón, comparta esa selección entre sus integrantes y la haga visible para la organización.
+
+## Requirements
 
 ### Requirement: Catálogo cerrado de desafíos
 El sistema SHALL reconocer exactamente los cinco desafíos oficiales del hackatón mediante identificadores estables y títulos canónicos, y MUST rechazar cualquier valor que no pertenezca a ese catálogo.

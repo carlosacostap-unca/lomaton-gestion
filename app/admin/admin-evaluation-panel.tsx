@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { JURY_CRITERIA, type EvaluationDto } from "@/lib/jury-evaluation-contract";
+import {
+  JURY_CRITERIA,
+  JURY_PLANILLA_CRITERIA,
+  PLANILLA_JURY_CRITERIA_VERSION,
+  type EvaluationDto,
+} from "@/lib/jury-evaluation-contract";
 import { callLomatonApi } from "@/lib/pocketbase/browser-api";
 
 type Dashboard = {
@@ -10,6 +15,7 @@ type Dashboard = {
     id: string;
     status: "open" | "cancelled" | "published";
     version: number;
+    criteriaVersion: string;
     jurorCount: number;
     teamCount: number;
     requiredCount: number;
@@ -88,8 +94,8 @@ export function AdminEvaluationPanel() {
       {error ? <div className="alert" role="alert">{error}</div> : null}
 
       {!isOpen ? (
-        <div className="evaluation-actions">
-          <p>Al abrir se congela la nómina vigente y se crean todas las combinaciones jurado-equipo.</p>
+          <div className="evaluation-actions">
+          <p>Al abrir se congela la nómina vigente y la matriz oficial de trece aspectos para todas las combinaciones jurado-equipo.</p>
           <button className="primary-button" disabled={Boolean(busy)} onClick={() => command("open", "/api/lomaton/admin/evaluation/open", {}, "Evaluación abierta.", "¿Abrir la evaluación y congelar la nómina actual de jurados y equipos?")}>Abrir nueva evaluación</button>
         </div>
       ) : (
@@ -123,15 +129,44 @@ export function AdminEvaluationPanel() {
                   {evaluation.status === "finalized" ? "Finalizada" : evaluation.status === "draft" ? "Borrador" : "Pendiente"}
                 </span>
                 <dl className="evaluation-score-summary">
-                  {JURY_CRITERIA.map((criterion) => <div key={criterion.key}><dt>{criterion.label}</dt><dd>{evaluation.scores[criterion.key] ?? "—"}</dd></div>)}
-                  <div><dt>Total</dt><dd>{evaluation.total === null ? "—" : evaluation.total.toFixed(2)}</dd></div>
+                  {evaluation.mode === "v2"
+                    ? JURY_PLANILLA_CRITERIA.map((criterion) => <div key={criterion.key}><dt>{criterion.label}</dt><dd>{evaluation.criterionAverages[criterion.key] === null ? "—" : evaluation.criterionAverages[criterion.key]?.toFixed(2) + " / 5"}</dd></div>)
+                    : JURY_CRITERIA.map((criterion) => <div key={criterion.key}><dt>{criterion.label}</dt><dd>{evaluation.scores[criterion.key] ?? "—"} / 10</dd></div>)}
+                  <div><dt>Total</dt><dd>{evaluation.total === null ? "—" : evaluation.total.toFixed(2) + (evaluation.mode === "v2" ? " / 100" : " / 10")}</dd></div>
                 </dl>
+                {evaluation.mode === "v2" ? (
+                  <details className="evaluation-admin-detail">
+                    <summary>Ver detalle de los 13 aspectos</summary>
+                    <div className="evaluation-admin-criteria">
+                      {JURY_PLANILLA_CRITERIA.map((criterion) => (
+                        <section key={criterion.key}>
+                          <h4>{criterion.label} · {criterion.weight}%</h4>
+                          <dl>
+                            {criterion.aspects.map((aspect) => (
+                              <div key={aspect.key}>
+                                <dt>{aspect.label}</dt>
+                                <dd>
+                                  <strong>{evaluation.aspectScores[aspect.key] ?? "Sin puntuar"}</strong>
+                                  {evaluation.aspectObservations[aspect.key] ? <span>{evaluation.aspectObservations[aspect.key]}</span> : <span className="muted">Sin observación</span>}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                          <p>Promedio: <strong>{evaluation.criterionAverages[criterion.key]?.toFixed(2) ?? "—"} / 5</strong> · Ponderado: <strong>{evaluation.weightedScores[criterion.key]?.toFixed(2) ?? "—"} / {criterion.weight}</strong></p>
+                        </section>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <p className="muted">Ciclo histórico con escala original 0–10.</p>
+                )}
                 {isOpen && evaluation.status === "finalized" ? <button className="secondary-button" disabled={Boolean(busy) || !reason.trim()} onClick={() => command(evaluation.id, "/api/lomaton/admin/evaluations/" + evaluation.id + "/reopen", { reason }, "Evaluación reabierta.", "¿Reabrir esta evaluación finalizada?")}>Reabrir</button> : null}
               </article>
             ))}
           </div>
         </>
       ) : null}
+      {cycle?.criteriaVersion === PLANILLA_JURY_CRITERIA_VERSION ? <p className="muted">Matriz vigente: 13 aspectos, escala 1–5 y total ponderado sobre 100.</p> : cycle ? <p className="muted">Matriz histórica: cinco criterios en escala 0–10.</p> : null}
     </section>
   );
 }

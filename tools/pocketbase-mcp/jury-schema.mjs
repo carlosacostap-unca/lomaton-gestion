@@ -9,6 +9,60 @@ export const juryCriteria = [
   { key: "teamwork", label: "Trabajo en equipo", weight: 15 },
 ];
 
+export const evaluationCycleV2Fields = [
+  { type: "json", name: "criteriaSnapshot", required: false },
+];
+
+export const juryEvaluationV2Fields = [
+  { type: "json", name: "aspectScores", required: false },
+  { type: "json", name: "aspectObservations", required: false },
+  { type: "number", name: "totalNumerator", onlyInt: true, min: 0 },
+  { type: "number", name: "totalDenominator", onlyInt: true, min: 0 },
+];
+
+export const evaluationResultV2Fields = [
+  { type: "json", name: "criterionAspectScoreSums", required: false },
+  { type: "number", name: "totalNumeratorSum", onlyInt: true, min: 0 },
+  { type: "number", name: "totalDenominator", onlyInt: true, min: 0 },
+];
+
+export const legacyEvaluationResultFieldNames = [
+  "innovationSum",
+  "impactSum",
+  "viabilitySum",
+  "presentationSum",
+  "teamworkSum",
+  "totalCentipointsSum",
+];
+
+export function mergeMissingFields(currentFields, desiredFields) {
+  const fields = [...currentFields];
+  const added = [];
+  for (const field of desiredFields) {
+    if (!fields.some((existing) => existing.name === field.name)) {
+      fields.push(field);
+      added.push(field.name);
+    }
+  }
+  return { fields, added };
+}
+
+export function removeFieldsByName(currentFields, names) {
+  const removed = new Set(names);
+  return currentFields.filter((field) => !removed.has(field.name));
+}
+
+export function makeFieldsOptional(currentFields, names) {
+  const optional = new Set(names);
+  let changed = false;
+  const fields = currentFields.map((field) => {
+    if (!optional.has(field.name) || field.required === false) return field;
+    changed = true;
+    return { ...field, required: false };
+  });
+  return { fields, changed };
+}
+
 const timestamps = [
   { type: "autodate", name: "created", onCreate: true, onUpdate: false },
   { type: "autodate", name: "updated", onCreate: true, onUpdate: true },
@@ -48,6 +102,7 @@ export function evaluationCyclesCollection(usersId) {
     fields: [
       { type: "select", name: "status", required: true, maxSelect: 1, values: ["open", "cancelled", "published"] },
       { type: "text", name: "criteriaVersion", required: true, max: 40 },
+      ...evaluationCycleV2Fields,
       { type: "number", name: "jurorCount", onlyInt: true, min: 0 },
       { type: "number", name: "teamCount", onlyInt: true, min: 0 },
       { type: "number", name: "requiredCount", onlyInt: true, min: 0 },
@@ -95,6 +150,7 @@ export function juryEvaluationsCollection(cyclesId, jurorsId, teamsId) {
       { type: "select", name: "completedCriteria", maxSelect: 5, values: juryCriteria.map((criterion) => criterion.key) },
       ...scoreFields,
       { type: "number", name: "totalCentipoints", onlyInt: true, min: 0, max: 1000 },
+      ...juryEvaluationV2Fields,
       { type: "number", name: "version", onlyInt: true, min: 0 },
       { type: "date", name: "finalizedAt" },
       ...timestamps,
@@ -121,12 +177,13 @@ export function evaluationResultsCollection(cyclesId, teamsId) {
       { type: "relation", name: "team", required: true, collectionId: teamsId, maxSelect: 1, cascadeDelete: false },
       { type: "text", name: "teamNameSnapshot", required: true, max: 120 },
       { type: "number", name: "jurorCount", required: true, onlyInt: true, min: 1 },
-      { type: "number", name: "innovationSum", required: true, onlyInt: true, min: 0 },
-      { type: "number", name: "impactSum", required: true, onlyInt: true, min: 0 },
-      { type: "number", name: "viabilitySum", required: true, onlyInt: true, min: 0 },
-      { type: "number", name: "presentationSum", required: true, onlyInt: true, min: 0 },
-      { type: "number", name: "teamworkSum", required: true, onlyInt: true, min: 0 },
-      { type: "number", name: "totalCentipointsSum", required: true, onlyInt: true, min: 0 },
+      { type: "number", name: "innovationSum", required: false, onlyInt: true, min: 0 },
+      { type: "number", name: "impactSum", required: false, onlyInt: true, min: 0 },
+      { type: "number", name: "viabilitySum", required: false, onlyInt: true, min: 0 },
+      { type: "number", name: "presentationSum", required: false, onlyInt: true, min: 0 },
+      { type: "number", name: "teamworkSum", required: false, onlyInt: true, min: 0 },
+      { type: "number", name: "totalCentipointsSum", required: false, onlyInt: true, min: 0 },
+      ...evaluationResultV2Fields,
       { type: "date", name: "publishedAt", required: true },
       ...timestamps,
     ],

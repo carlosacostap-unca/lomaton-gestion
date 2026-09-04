@@ -20,6 +20,7 @@
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "exceljs": "^4.4.0",
+    "file-type": "^21.3.4",
     "next": "16.3.3",
     "papaparse": "^5.7.0",
     "pocketbase": "^0.28.0",

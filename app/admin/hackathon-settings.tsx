@@ -25,12 +25,23 @@ export function HackathonSettings() {
     setMessage("");
     try {
       const deadlineLocal = String(formData.get("deadlineLocal") ?? "");
+      const deliverablesDeadlineLocal = String(formData.get("deliverablesDeadlineLocal") ?? "");
+      const deliverablesDeadlineUtc = argentinaInputToUtc(deliverablesDeadlineLocal);
+      const closesImmediately = Boolean(
+        deliverablesDeadlineUtc && new Date(deliverablesDeadlineUtc).getTime() <= Date.now() &&
+        deliverablesDeadlineUtc !== String(settings?.deliverablesDeadlineUtc ?? ""),
+      );
+      if (closesImmediately && !window.confirm("El plazo elegido cerrará las entregas inmediatamente. ¿Querés continuar?")) {
+        return;
+      }
       const updated = await callLomatonApi<RecordModel>("/api/lomaton/admin/settings", {
         method: "PATCH",
         body: {
           deadlineUtc: argentinaInputToUtc(deadlineLocal),
+          deliverablesDeadlineUtc,
           formationOpen: formData.get("formationOpen") === "on",
           reason: formData.get("reason"),
+          confirmImmediateDeliverablesClosure: closesImmediately,
         },
       });
       setSettings(updated);
@@ -45,12 +56,17 @@ export function HackathonSettings() {
 
   return (
     <section className="panel" aria-labelledby="settings-title">
-      <h2 id="settings-title">Plazo de formación</h2>
-      <p className="muted">La fecha se ingresa en hora argentina y se guarda en UTC. El cierre manual tiene efecto inmediato.</p>
+      <h2 id="settings-title">Plazos del hackathon</h2>
+      <p className="muted">Las fechas se ingresan en hora argentina y se guardan en UTC. Formación y entregas se administran por separado.</p>
       {settings ? <form action={save} className="upload-form" key={`${settings.id}-${settings.updated}`}>
-        <label htmlFor="deadline-local">Fecha y hora límite (Argentina)</label>
+        <h3>Formación de equipos</h3>
+        <label htmlFor="deadline-local">Fecha y hora límite de formación (Argentina)</label>
         <input id="deadline-local" name="deadlineLocal" type="datetime-local" defaultValue={utcToArgentinaInput(settings.deadlineUtc)} />
         <label className="checkbox-row"><input name="formationOpen" type="checkbox" defaultChecked={Boolean(settings.formationOpen)} /> Formación de equipos habilitada</label>
+        <h3>Entrega de productos</h3>
+        <label htmlFor="deliverables-deadline-local">Fecha y hora límite de entregas (Argentina)</label>
+        <input id="deliverables-deadline-local" name="deliverablesDeadlineLocal" type="datetime-local" required defaultValue={utcToArgentinaInput(settings.deliverablesDeadlineUtc)} />
+        <p className="muted">Después de este instante, los equipos podrán consultar su entrega pero no modificarla.</p>
         <label htmlFor="settings-reason">Motivo del cambio</label>
         <input id="settings-reason" name="reason" placeholder="Ej.: prórroga aprobada por organización" />
         <button className="primary-button" disabled={busy}>{busy ? "Guardando…" : "Guardar configuración"}</button>

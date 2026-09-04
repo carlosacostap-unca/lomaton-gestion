@@ -71,9 +71,33 @@ function fakePocketBase(seed: Record<string, Item[]>, sendError?: Error) {
 const admin = { id: "admin1", enabled: true, isAdmin: true } as never;
 const jurorUser = { id: "user-j1", enabled: true, isAdmin: false, juror: "juror1" } as never;
 const scores = { innovation: 8, impact: 7, viability: 9, presentation: 6, teamwork: 10 };
+const aspectScores = {
+  innovationNovelty: 5,
+  innovationDifferentiation: 4,
+  innovationIntegration: 3,
+  impactRelevance: 4,
+  impactContribution: 4,
+  impactMeasurability: 4,
+  viabilityCoherence: 3,
+  viabilityResources: 3,
+  viabilityRisks: 3,
+  presentationClarity: 5,
+  presentationSynthesis: 5,
+  presentationEvidence: 4,
+  teamworkIntegration: 4,
+};
 
 function openCycle() {
   return { id: "cycle1", status: "open", jurorCount: 2, teamCount: 2, requiredCount: 4, finalizedCount: 0, version: 1, created: "2026-09-03" };
+}
+
+function planillaCycle(overrides: Record<string, unknown> = {}) {
+  return {
+    ...openCycle(),
+    criteriaVersion: "lomaton-2026-planilla-v2",
+    criteriaSnapshot: jury.JURY_PLANILLA_RUBRIC,
+    ...overrides,
+  };
 }
 
 function evaluation(overrides: Record<string, unknown> = {}): Item {
@@ -83,6 +107,16 @@ function evaluation(overrides: Record<string, unknown> = {}): Item {
     status: "pending", completedCriteria: [], totalCentipoints: 0, version: 1,
     ...overrides,
   };
+}
+
+function planillaEvaluation(overrides: Record<string, unknown> = {}): Item {
+  return evaluation({
+    aspectScores: {},
+    aspectObservations: {},
+    totalNumerator: 0,
+    totalDenominator: 0,
+    ...overrides,
+  });
 }
 
 describe("jury evaluation domain", () => {
@@ -108,6 +142,13 @@ describe("jury evaluation domain", () => {
       ],
     });
     await expect(jury.openAdminEvaluation(pb, admin)).resolves.toMatchObject({ requiredCount: 4 });
+    expect(operations).toContainEqual(expect.objectContaining({
+      collection: "evaluation_cycles",
+      data: expect.objectContaining({
+        criteriaVersion: "lomaton-2026-planilla-v2",
+        criteriaSnapshot: jury.JURY_PLANILLA_RUBRIC,
+      }),
+    }));
     expect(operations.filter((item) => item.collection === "jury_evaluations")).toHaveLength(4);
     expect(new Set(operations.filter((item) => item.collection === "jury_evaluations").map((item) => String(item.data?.juror) + "/" + String(item.data?.team))).size).toBe(4);
     expect(send).toHaveBeenCalledTimes(1);
@@ -209,6 +250,81 @@ describe("jury evaluation domain", () => {
       .rejects.toMatchObject({ code: "evaluation_finalized" });
   });
 
+  it("saves private planilla observations, rejects invalid values, and finalizes thirteen aspects", async () => {
+    const draftStore = fakePocketBase({
+      evaluation_cycles: [planillaCycle()],
+      jury_evaluations: [planillaEvaluation()],
+    });
+    const draft = await jury.saveOwnEvaluation(draftStore.pb, jurorUser, "evaluation1", {
+      expectedVersion: 1,
+      criteriaVersion: "lomaton-2026-planilla-v2",
+      aspectScores: { innovationNovelty: 5 },
+      aspectObservations: { impactRelevance: "  Validar con usuarios  " },
+      finalize: false,
+    });
+    expect(draft).toMatchObject({
+      mode: "v2",
+      status: "draft",
+      aspectScores: { innovationNovelty: 5 },
+      aspectObservations: { impactRelevance: "Validar con usuarios" },
+      completedAspects: ["innovationNovelty"],
+    });
+
+    const incomplete = fakePocketBase({
+      evaluation_cycles: [planillaCycle()],
+      jury_evaluations: [planillaEvaluation()],
+    });
+    await expect(jury.saveOwnEvaluation(incomplete.pb, jurorUser, "evaluation1", {
+      expectedVersion: 1,
+      criteriaVersion: "lomaton-2026-planilla-v2",
+      aspectScores: { innovationNovelty: 5 },
+      aspectObservations: {},
+      finalize: true,
+    })).rejects.toMatchObject({ code: "evaluation_incomplete" });
+
+    const invalid = fakePocketBase({
+      evaluation_cycles: [planillaCycle()],
+      jury_evaluations: [planillaEvaluation()],
+    });
+    await expect(jury.saveOwnEvaluation(invalid.pb, jurorUser, "evaluation1", {
+      expectedVersion: 1,
+      criteriaVersion: "lomaton-2026-planilla-v2",
+      aspectScores: { innovationNovelty: 2.5 },
+      aspectObservations: {},
+      finalize: false,
+    })).rejects.toMatchObject({ code: "invalid_score" });
+    await expect(jury.saveOwnEvaluation(invalid.pb, jurorUser, "evaluation1", {
+      expectedVersion: 1,
+      criteriaVersion: "lomaton-2026-v1",
+      scores,
+      finalize: false,
+    })).rejects.toMatchObject({ code: "evaluation_payload_version_mismatch" });
+
+    const complete = fakePocketBase({
+      evaluation_cycles: [planillaCycle()],
+      jury_evaluations: [planillaEvaluation()],
+    });
+    const finalized = await jury.saveOwnEvaluation(complete.pb, jurorUser, "evaluation1", {
+      expectedVersion: 1,
+      criteriaVersion: "lomaton-2026-planilla-v2",
+      aspectScores,
+      aspectObservations: { innovationNovelty: "Privada" },
+      finalize: true,
+    });
+    expect(finalized).toMatchObject({
+      mode: "v2",
+      status: "finalized",
+      total: 78,
+      criterionAverages: { innovation: 4, presentation: 4.67 },
+    });
+    expect(complete.operations).toContainEqual(expect.objectContaining({
+      collection: "jury_evaluations",
+      data: expect.objectContaining({ totalNumerator: 78, totalDenominator: 1 }),
+    }));
+    const audit = complete.operations.find((item) => item.collection === "audit_logs");
+    expect(JSON.stringify(audit)).not.toContain("Privada");
+  });
+
   it("reopens one finalized evaluation and blocks publication again", async () => {
     const { pb, operations } = fakePocketBase({
       evaluation_cycles: [openCycle()],
@@ -241,6 +357,32 @@ describe("jury evaluation domain", () => {
     expect(published.send).toHaveBeenCalledTimes(1);
   });
 
+  it("publishes exact planilla aggregates for every juror and team", async () => {
+    const allThree = Object.fromEntries(jury.JURY_PLANILLA_ASPECTS.map((aspect) => [aspect.key, 3]));
+    const rows = [
+      planillaEvaluation({ id: "p1", status: "finalized", juror: "juror1", aspectScores: allThree }),
+      planillaEvaluation({ id: "p2", status: "finalized", juror: "juror2", aspectScores: allThree }),
+      planillaEvaluation({ id: "p3", team: "team2", teamNameSnapshot: "Equipo Dos", status: "finalized", juror: "juror1", aspectScores: allThree }),
+      planillaEvaluation({ id: "p4", team: "team2", teamNameSnapshot: "Equipo Dos", status: "finalized", juror: "juror2", aspectScores: allThree }),
+    ];
+    const store = fakePocketBase({ evaluation_cycles: [planillaCycle()], jury_evaluations: rows });
+    await jury.publishAdminEvaluation(store.pb, admin, "cycle1", 1);
+    const results = store.operations.filter((item) => item.collection === "evaluation_results");
+    expect(results).toHaveLength(2);
+    expect(results[0].data).toMatchObject({
+      jurorCount: 2,
+      criterionAspectScoreSums: {
+        innovation: 18,
+        impact: 18,
+        viability: 18,
+        presentation: 18,
+        teamwork: 6,
+      },
+      totalNumeratorSum: 120,
+      totalDenominator: 1,
+    });
+  });
+
   it("returns only the published aggregate for the current student's team", async () => {
     const { pb } = fakePocketBase({
       team_memberships: [{ id: "membership1", candidate: "candidate1", team: "team1" }],
@@ -256,5 +398,46 @@ describe("jury evaluation domain", () => {
     expect(result).toMatchObject({ published: true, teamId: "team1", scores: { innovation: 8, impact: 7, viability: 9, presentation: 6, teamwork: 10 }, total: 8 });
     expect(result).not.toHaveProperty("jurorName");
     expect(JSON.stringify(result)).not.toContain("individual");
+  });
+
+  it("returns only consolidated planilla averages and total to the team", async () => {
+    const { pb } = fakePocketBase({
+      team_memberships: [{ id: "membership1", candidate: "candidate1", team: "team1" }],
+      evaluation_cycles: [planillaCycle({ status: "published", publishedAt: "2026-09-03" })],
+      evaluation_results: [{
+        id: "result1",
+        cycle: "cycle1",
+        team: "team1",
+        teamNameSnapshot: "Equipo Uno",
+        jurorCount: 2,
+        criterionAspectScoreSums: {
+          innovation: 18,
+          impact: 18,
+          viability: 18,
+          presentation: 18,
+          teamwork: 6,
+        },
+        totalNumeratorSum: 120,
+        totalDenominator: 1,
+        aspectObservations: { innovationNovelty: "secreto" },
+        publishedAt: "2026-09-03",
+      }],
+    });
+    const result = await jury.getOwnTeamEvaluationResult(pb, { candidate: "candidate1" } as never);
+    expect(result).toMatchObject({
+      published: true,
+      mode: "v2",
+      criteriaVersion: "lomaton-2026-planilla-v2",
+      criterionAverages: {
+        innovation: 3,
+        impact: 3,
+        viability: 3,
+        presentation: 3,
+        teamwork: 3,
+      },
+      total: 60,
+    });
+    expect(JSON.stringify(result)).not.toContain("aspect");
+    expect(JSON.stringify(result)).not.toContain("secreto");
   });
 });

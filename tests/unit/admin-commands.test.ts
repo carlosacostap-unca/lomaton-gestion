@@ -65,6 +65,7 @@ function settings(formationOpen = true): Item {
     key: "default",
     formationOpen,
     deadlineUtc: "2030-12-31T23:59:00.000Z",
+    deliverablesDeadlineUtc: "2030-12-31T23:59:00.000Z",
     dataVersion: 1,
   };
 }
@@ -92,6 +93,34 @@ describe("admin hackathon commands", () => {
         data: expect.objectContaining({ action: "hackathon.settings.update", reason: "cierre aprobado" }),
       }),
     ]));
+  });
+
+  it("requires explicit confirmation before moving the delivery deadline to the past", async () => {
+    const first = fakePocketBase({ hackathon_settings: [settings()] });
+    await expect(updateHackathonSettings(first.pb, admin, {
+      deadlineUtc: "2030-09-10T21:30:00-03:00",
+      deliverablesDeadlineUtc: "2020-09-10T21:30:00-03:00",
+      formationOpen: true,
+      reason: "cierre extraordinario",
+    })).rejects.toMatchObject({
+      status: 409,
+      code: "deliverables_deadline_confirmation_required",
+    });
+    expect(first.send).not.toHaveBeenCalled();
+
+    const confirmed = fakePocketBase({ hackathon_settings: [settings()] });
+    await updateHackathonSettings(confirmed.pb, admin, {
+      deadlineUtc: "2030-09-10T21:30:00-03:00",
+      deliverablesDeadlineUtc: "2020-09-10T21:30:00-03:00",
+      formationOpen: true,
+      reason: "cierre extraordinario",
+      confirmImmediateDeliverablesClosure: true,
+    });
+    expect(confirmed.operations).toContainEqual(expect.objectContaining({
+      collection: "hackathon_settings",
+      method: "update",
+      data: expect.objectContaining({ deliverablesDeadlineUtc: "2020-09-11T00:30:00.000Z" }),
+    }));
   });
 
   it("requires a reason for an administrative team intervention after closure", async () => {

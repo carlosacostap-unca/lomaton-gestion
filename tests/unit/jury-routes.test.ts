@@ -49,11 +49,12 @@ vi.doMock("@/lib/report/snapshot", () => ({ readConsistentReportSnapshot: vi.fn(
 
 const route = await import("@/app/api/lomaton/[...path]/route");
 const routeContext = (path: string[]) => ({ params: Promise.resolve({ path }) });
+const service = { service: true, collection: () => ({ getOne: vi.fn().mockResolvedValue({ id: "juror1", active: true }) }) };
 
 describe("jury route authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.createService.mockResolvedValue({ service: true });
+    mocks.createService.mockResolvedValue(service);
     mocks.requireUser.mockResolvedValue({ user: { id: "student", candidate: "candidate1" } });
     mocks.requireAdmin.mockResolvedValue({ user: { id: "admin", isAdmin: true } });
     mocks.requireJuror.mockResolvedValue({ user: { id: "jury-user", juror: "juror1" } });
@@ -66,7 +67,7 @@ describe("jury route authorization", () => {
   it("protects the administrative juror list", async () => {
     const response = await route.GET(new Request("https://app.test/api/lomaton/admin/jurors"), routeContext(["admin", "jurors"]));
     expect(response.status).toBe(200);
-    expect(mocks.listJurors).toHaveBeenCalledWith({ service: true });
+    expect(mocks.listJurors).toHaveBeenCalledWith(service);
     mocks.requireAdmin.mockRejectedValueOnce(new ApiError(403, "Sin permiso.", "admin_required"));
     const denied = await route.GET(new Request("https://app.test/api/lomaton/admin/jurors"), routeContext(["admin", "jurors"]));
     expect(denied.status).toBe(403);
@@ -86,7 +87,7 @@ describe("jury route authorization", () => {
   it("allows a juror and rejects decimal score payloads", async () => {
     const response = await route.GET(new Request("https://app.test/api/lomaton/jury/evaluations"), routeContext(["jury", "evaluations"]));
     expect(response.status).toBe(200);
-    expect(mocks.getJury).toHaveBeenCalledWith({ service: true }, expect.objectContaining({ juror: "juror1" }));
+    expect(mocks.getJury).toHaveBeenCalledWith(service, expect.objectContaining({ juror: "juror1" }));
 
     const invalid = await route.PATCH(new Request("https://app.test/api/lomaton/jury/evaluations/e1", {
       method: "PATCH",
@@ -97,10 +98,50 @@ describe("jury route authorization", () => {
     expect(mocks.save).not.toHaveBeenCalled();
   });
 
+  it("accepts only the discriminated planilla contract and rejects unknown aspects", async () => {
+    mocks.save.mockResolvedValue({ id: "e1", mode: "v2" });
+    const valid = await route.PATCH(new Request("https://app.test/api/lomaton/jury/evaluations/e1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        criteriaVersion: "lomaton-2026-planilla-v2",
+        aspectScores: { innovationNovelty: 5 },
+        aspectObservations: { innovationNovelty: "Buen enfoque" },
+        finalize: false,
+      }),
+    }), routeContext(["jury", "evaluations", "e1"]));
+    expect(valid.status).toBe(200);
+    expect(mocks.save).toHaveBeenCalledWith(
+      service,
+      expect.objectContaining({ juror: "juror1" }),
+      "e1",
+      expect.objectContaining({
+        criteriaVersion: "lomaton-2026-planilla-v2",
+        aspectScores: { innovationNovelty: 5 },
+      }),
+    );
+
+    mocks.save.mockClear();
+    const invalid = await route.PATCH(new Request("https://app.test/api/lomaton/jury/evaluations/e1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        expectedVersion: 1,
+        criteriaVersion: "lomaton-2026-planilla-v2",
+        aspectScores: { inventedAspect: 5 },
+        aspectObservations: {},
+        finalize: false,
+      }),
+    }), routeContext(["jury", "evaluations", "e1"]));
+    expect(invalid.status).toBe(400);
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
   it("serves team result only through the authenticated own-result route", async () => {
     const response = await route.GET(new Request("https://app.test/api/lomaton/me/evaluation-result"), routeContext(["me", "evaluation-result"]));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ published: false, teamId: "team1" });
-    expect(mocks.getResult).toHaveBeenCalledWith({ service: true }, expect.objectContaining({ candidate: "candidate1" }));
+    expect(mocks.getResult).toHaveBeenCalledWith(service, expect.objectContaining({ candidate: "candidate1" }));
   });
 });

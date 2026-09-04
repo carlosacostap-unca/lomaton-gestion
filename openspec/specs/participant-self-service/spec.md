@@ -79,20 +79,51 @@ El sistema MUST aplicar cada edición de perfil de forma atómica, detectar vers
 - **THEN** ninguna parte de la edición queda persistida
 
 ### Requirement: Consulta del resultado publicado del equipo
-El sistema SHALL permitir que un estudiante integrante de un equipo consulte los resultados consolidados de su propio equipo solamente después de su publicación administrativa y MUST impedirle consultar evaluaciones individuales o resultados de otros equipos.
+El sistema SHALL permitir que un estudiante integrante de un equipo consulte los resultados consolidados de su propio equipo solamente después de su publicación administrativa y MUST impedirle consultar aspectos, observaciones, evaluaciones individuales o resultados de otros equipos.
 
 #### Scenario: Resultado todavía no publicado
 - **WHEN** el estudiante consulta su equipo antes de la publicación
 - **THEN** el portal informa que los resultados todavía no están disponibles sin revelar puntajes ni avance
 
+#### Scenario: Resultado publicado con la nueva planilla
+- **WHEN** el estudiante consulta un resultado publicado con la matriz de trece aspectos
+- **THEN** el portal muestra los cinco promedios consolidados de su equipo en escala 1–5 y el total ponderado general sobre 100
+
 #### Scenario: Resultado publicado
-- **WHEN** el estudiante consulta su equipo después de la publicación
-- **THEN** el portal muestra los promedios de su equipo para los cinco criterios y el total ponderado general
+- **WHEN** el estudiante consulta un resultado de su equipo que la administración ya publicó
+- **THEN** el portal presenta el resultado según la versión de rúbrica que quedó congelada para ese ciclo
+
+#### Scenario: Resultado histórico publicado
+- **WHEN** el estudiante consulta un resultado publicado con la matriz anterior
+- **THEN** el portal mantiene la escala histórica 0–10 y la identifica sin convertirla a la nueva escala
 
 #### Scenario: Privacidad de las evaluaciones
 - **WHEN** el portal presenta un resultado publicado
-- **THEN** omite la identidad de los jurados, sus puntajes individuales, borradores y metadatos internos
+- **THEN** omite la identidad de los jurados, los puntajes y observaciones por aspecto, sus evaluaciones individuales, borradores y metadatos internos
 
 #### Scenario: Resultado de otro equipo
 - **WHEN** el estudiante intenta consultar el resultado de un equipo al que no pertenece
 - **THEN** el sistema deniega la consulta sin revelar si el resultado existe
+
+### Requirement: Autogestión de la entrega del equipo
+El sistema SHALL mostrar a cada estudiante con membresía vigente la entrega compartida de su equipo, sus cinco productos, el estado, los faltantes y la fecha y hora límite en `America/Argentina/Buenos_Aires`, y SHALL ofrecer las acciones de carga, enlace, reemplazo, retiro y finalización solamente mientras el plazo esté abierto.
+
+#### Scenario: Equipo sin entrega
+- **WHEN** un integrante abre su portal antes de la primera carga
+- **THEN** el sistema muestra los cinco productos, distingue los cuatro obligatorios del Video opcional e informa el plazo vigente
+
+#### Scenario: Borrador del equipo
+- **WHEN** un integrante abre una entrega parcial
+- **THEN** el sistema muestra los productos confirmados, los faltantes obligatorios, su versión y las acciones todavía disponibles
+
+#### Scenario: Entrega finalizada dentro del plazo
+- **WHEN** un integrante abre una entrega finalizada antes del cierre
+- **THEN** el sistema identifica la fecha de finalización y permite reemplazar productos advirtiendo que el cambio devolverá la entrega a borrador
+
+#### Scenario: Entrega cerrada por vencimiento
+- **WHEN** un integrante abre su entrega después del límite
+- **THEN** el portal presenta la última versión en modo lectura, su estado real y la fecha de cierre sin ofrecer controles de modificación
+
+#### Scenario: Estudiante sin equipo
+- **WHEN** un estudiante que no posee membresía vigente consulta el portal
+- **THEN** el sistema informa que necesita integrar un equipo y no crea ni expone una entrega

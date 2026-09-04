@@ -20,6 +20,16 @@ import {
   withdrawInvitation,
 } from "@/lib/domain/team-commands";
 import { TEAM_CHALLENGE_IDS } from "@/lib/domain/team-challenges";
+import { validateDeliverableFile } from "@/lib/domain/team-deliverable-validation";
+import {
+  finalizeOwnDeliverable,
+  getOwnTeamDeliverable,
+  getTeamDeliverable,
+  listTeamDeliverables,
+  removeOwnDeliverableProduct,
+  saveOwnDeliverableFile,
+  saveOwnDeliverableLink,
+} from "@/lib/domain/team-deliverables";
 import {
   assignAdminMentor,
   getOwnMentorDashboard,
@@ -56,6 +66,14 @@ import {
 } from "@/lib/pocketbase/server";
 import { readConsistentReportSnapshot } from "@/lib/report/snapshot";
 import { ApiError, errorResponse } from "@/lib/server/api-error";
+import { getServerEnv } from "@/lib/env/server";
+import { proxyDeliverableFile } from "@/lib/server/deliverable-routes";
+import { TEAM_DELIVERABLE_KINDS } from "@/lib/team-deliverables-contract";
+import {
+  LEGACY_JURY_CRITERIA_VERSION,
+  MAX_ASPECT_OBSERVATION_LENGTH,
+  PLANILLA_JURY_CRITERIA_VERSION,
+} from "@/lib/jury-evaluation-contract";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +84,24 @@ const invitationSchema = z.object({ candidateId: z.string().min(1) });
 const teamChallengeSchema = z.object({ challengeId: z.enum(TEAM_CHALLENGE_IDS) }).strict();
 const settingsSchema = z.object({
   deadlineUtc: z.string(),
+  deliverablesDeadlineUtc: z.string(),
   formationOpen: z.boolean(),
   reason: z.string().max(1000).default(""),
+  confirmImmediateDeliverablesClosure: z.boolean().default(false),
 });
+const deliverableKindSchema = z.enum(TEAM_DELIVERABLE_KINDS);
+const deliverableVersionSchema = z.object({
+  expectedVersion: z.number().int().min(0),
+}).strict();
+const deliverableLinkSchema = deliverableVersionSchema.extend({
+  url: z.string().max(2048),
+}).strict();
+
+function deliverableKind(value: string) {
+  const result = deliverableKindSchema.safeParse(value);
+  if (!result.success) throw new ApiError(404, "El producto no existe.", "invalid_deliverable_kind");
+  return result.data;
+}
 const adminTeamSchema = z.object({
   name: z.string(),
   ownerCandidateId: z.string().min(1),
@@ -132,11 +165,53 @@ const evaluationScoresSchema = z.object({
   presentation: z.number().int().min(0).max(10).optional(),
   teamwork: z.number().int().min(0).max(10).optional(),
 }).strict();
-const evaluationSaveSchema = z.object({
+const legacyEvaluationSaveSchema = z.object({
   expectedVersion: z.number().int().min(1),
+  criteriaVersion: z.literal(LEGACY_JURY_CRITERIA_VERSION),
   scores: evaluationScoresSchema,
   finalize: z.boolean(),
 }).strict();
+const planillaAspectScoresSchema = z.object({
+  innovationNovelty: z.number().int().min(1).max(5).optional(),
+  innovationDifferentiation: z.number().int().min(1).max(5).optional(),
+  innovationIntegration: z.number().int().min(1).max(5).optional(),
+  impactRelevance: z.number().int().min(1).max(5).optional(),
+  impactContribution: z.number().int().min(1).max(5).optional(),
+  impactMeasurability: z.number().int().min(1).max(5).optional(),
+  viabilityCoherence: z.number().int().min(1).max(5).optional(),
+  viabilityResources: z.number().int().min(1).max(5).optional(),
+  viabilityRisks: z.number().int().min(1).max(5).optional(),
+  presentationClarity: z.number().int().min(1).max(5).optional(),
+  presentationSynthesis: z.number().int().min(1).max(5).optional(),
+  presentationEvidence: z.number().int().min(1).max(5).optional(),
+  teamworkIntegration: z.number().int().min(1).max(5).optional(),
+}).strict();
+const planillaObservationsSchema = z.object({
+  innovationNovelty: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  innovationDifferentiation: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  innovationIntegration: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  impactRelevance: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  impactContribution: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  impactMeasurability: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  viabilityCoherence: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  viabilityResources: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  viabilityRisks: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  presentationClarity: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  presentationSynthesis: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  presentationEvidence: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+  teamworkIntegration: z.string().max(MAX_ASPECT_OBSERVATION_LENGTH).optional(),
+}).strict();
+const planillaEvaluationSaveSchema = z.object({
+  expectedVersion: z.number().int().min(1),
+  criteriaVersion: z.literal(PLANILLA_JURY_CRITERIA_VERSION),
+  aspectScores: planillaAspectScoresSchema,
+  aspectObservations: planillaObservationsSchema.default({}),
+  finalize: z.boolean(),
+}).strict();
+const evaluationSaveSchema = z.discriminatedUnion("criteriaVersion", [
+  legacyEvaluationSaveSchema,
+  planillaEvaluationSaveSchema,
+]);
 const evaluationVersionSchema = z.object({
   expectedVersion: z.number().int().min(1),
 }).strict();
@@ -167,12 +242,26 @@ async function adminContext(request: Request) {
 async function juryContext(request: Request) {
   const { user } = await requirePocketBaseJuror(request.headers.get("authorization"));
   const pb = await createPocketBaseServiceClient();
+  try {
+    const juror = await pb.collection("jurors").getOne(String(user.juror));
+    if (juror.active !== true) throw new ApiError(403, "Se requiere un jurado activo.", "juror_required");
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (typeof error === "object" && error && "status" in error && error.status === 404) {
+      throw new ApiError(403, "Se requiere un jurado activo.", "juror_required");
+    }
+    throw error;
+  }
   return { user, pb };
 }
 
 export async function GET(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
+    if (path.length === 4 && path[0] === "deliverables" && path[2] === "files") {
+      const { user, pb } = await context(request);
+      return proxyDeliverableFile(pb, user, path[1], deliverableKind(path[3]));
+    }
     if (path[0] === "admin") {
       const { pb } = await adminContext(request);
       if (path.length === 2 && path[1] === "report-snapshot") {
@@ -183,6 +272,12 @@ export async function GET(request: Request, routeContext: Context) {
       }
       if (path.length === 3 && path[1] === "teams") {
         return Response.json(await getAdminTeamDetail(pb, path[2]));
+      }
+      if (path.length === 2 && path[1] === "deliverables") {
+        return Response.json(await listTeamDeliverables(pb));
+      }
+      if (path.length === 3 && path[1] === "deliverables") {
+        return Response.json(await getTeamDeliverable(pb, path[2]));
       }
       if (path.length === 2 && path[1] === "students") {
         return Response.json(await listAdminStudents(pb));
@@ -209,10 +304,16 @@ export async function GET(request: Request, routeContext: Context) {
       const { user, pb } = await juryContext(request);
       return Response.json(await getJuryDashboard(pb, user));
     }
+    if (path.length >= 2 && path[0] === "jury" && path[1] === "deliverables") {
+      const { pb } = await juryContext(request);
+      if (path.length === 2) return Response.json(await listTeamDeliverables(pb));
+      if (path.length === 3) return Response.json(await getTeamDeliverable(pb, path[2]));
+    }
     const { user, pb } = await context(request);
     if (path.length === 2 && path[0] === "me" && path[1] === "profile") return Response.json(await getOwnProfile(pb, user));
     if (path.length === 2 && path[0] === "me" && path[1] === "mentor") return Response.json(await getOwnMentorDashboard(pb, user));
     if (path.length === 2 && path[0] === "me" && path[1] === "evaluation-result") return Response.json(await getOwnTeamEvaluationResult(pb, user));
+    if (path.length === 2 && path[0] === "me" && path[1] === "deliverable") return Response.json(await getOwnTeamDeliverable(pb, user));
     if (path.length === 3 && path[0] === "teams" && path[2] === "mentor") return Response.json(await getTeamMentorState(pb, user, path[1]));
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
@@ -223,6 +324,27 @@ export async function GET(request: Request, routeContext: Context) {
 export async function PATCH(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
+    if (path.length === 4 && path[0] === "me" && path[1] === "deliverable" && path[2] === "products") {
+      const { user, pb } = await context(request);
+      const kind = deliverableKind(path[3]);
+      if (request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
+        const maxBytes = getServerEnv().deliverableMaxBytes;
+        const contentLength = Number(request.headers.get("content-length") ?? 0);
+        if (Number.isFinite(contentLength) && contentLength > maxBytes + 1024 * 1024) {
+          throw new ApiError(413, "La carga supera el máximo permitido.", "deliverable_file_too_large");
+        }
+        const form = await request.formData();
+        const file = form.get("file");
+        if (!(file instanceof File)) {
+          throw new ApiError(400, "Debés adjuntar un archivo.", "deliverable_file_required");
+        }
+        const expectedVersion = z.coerce.number().int().min(0).parse(form.get("expectedVersion"));
+        const validated = await validateDeliverableFile(kind, file, maxBytes);
+        return Response.json(await saveOwnDeliverableFile(pb, user, kind, validated, expectedVersion));
+      }
+      const input = deliverableLinkSchema.parse(await body(request));
+      return Response.json(await saveOwnDeliverableLink(pb, user, kind, input.url, input.expectedVersion));
+    }
     if (path.length === 2 && path[0] === "me" && path[1] === "profile") {
       const { user, pb } = await context(request);
       return Response.json(await updateOwnProfile(pb, user, profileUpdateSchema.parse(await body(request))));
@@ -268,6 +390,11 @@ export async function PATCH(request: Request, routeContext: Context) {
 export async function POST(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
+    if (path.length === 3 && path[0] === "me" && path[1] === "deliverable" && path[2] === "finalize") {
+      const { user, pb } = await context(request);
+      const input = deliverableVersionSchema.parse(await body(request));
+      return Response.json(await finalizeOwnDeliverable(pb, user, input.expectedVersion));
+    }
     if (path[0] === "admin") {
       const { user, pb } = await adminContext(request);
       if (path.length === 2 && path[1] === "teams") {
@@ -362,6 +489,12 @@ export async function PUT(request: Request, routeContext: Context) {
 export async function DELETE(request: Request, routeContext: Context) {
   try {
     const { path } = await routeContext.params;
+    if (path.length === 4 && path[0] === "me" && path[1] === "deliverable" && path[2] === "products") {
+      const { user, pb } = await context(request);
+      const kind = deliverableKind(path[3]);
+      const input = deliverableVersionSchema.parse(await body(request));
+      return Response.json(await removeOwnDeliverableProduct(pb, user, kind, input.expectedVersion));
+    }
     if (path[0] === "admin") {
       const { user, pb } = await adminContext(request);
       if (path.length === 3 && path[1] === "teams") {
@@ -393,6 +526,9 @@ export async function DELETE(request: Request, routeContext: Context) {
     }
     throw new ApiError(404, "La operación no existe.", "route_not_found");
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return errorResponse(new ApiError(400, "Los datos enviados no son válidos.", "validation_error", error.issues));
+    }
     return errorResponse(error);
   }
 }

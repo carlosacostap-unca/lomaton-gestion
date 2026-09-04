@@ -7,7 +7,7 @@ Ofrecer a la organización una visión actual y exportable del padrón y de la c
 ## Requirements
 
 ### Requirement: Consulta administrativa del estado del hackatón
-El sistema SHALL permitir que los administradores consulten y filtren candidatos, equipos, miembros e invitaciones por sus estados relevantes.
+El sistema SHALL permitir que los administradores consulten y filtren candidatos, equipos, miembros e invitaciones por sus estados relevantes, y SHALL incluir para cada equipo el desafío oficial seleccionado o indicar explícitamente que todavía no realizó una selección.
 
 #### Scenario: Resumen general
 - **WHEN** un administrador abre el área de seguimiento
@@ -17,12 +17,20 @@ El sistema SHALL permitir que los administradores consulten y filtren candidatos
 - **WHEN** un administrador filtra equipos incompletos o inválidos
 - **THEN** el sistema muestra solamente los equipos coincidentes y el motivo de su estado
 
+#### Scenario: Equipo con desafío seleccionado
+- **WHEN** un administrador consulta el listado o el detalle de un equipo que posee una selección válida
+- **THEN** el sistema muestra el título canónico del único desafío elegido junto con los demás datos operativos del equipo
+
+#### Scenario: Equipo sin desafío seleccionado
+- **WHEN** un administrador consulta el listado o el detalle de un equipo sin selección
+- **THEN** el sistema muestra un estado explícito “Sin seleccionar” sin omitir el equipo ni inventar un desafío
+
 #### Scenario: Acceso no administrativo
-- **WHEN** un candidato intenta acceder a los reportes administrativos
-- **THEN** el sistema deniega el acceso sin exponer datos del padrón o de otros equipos
+- **WHEN** una cuenta no administradora intenta consultar la vista administrativa de equipos
+- **THEN** el sistema deniega el acceso y no expone el desafío ni los demás datos administrativos
 
 ### Requirement: Exportación a CSV y Excel
-El sistema SHALL permitir que un administrador exporte el estado vigente en formatos CSV y Excel.
+El sistema SHALL permitir que un administrador exporte el estado vigente en formatos CSV y Excel, y SHALL incluir el desafío oficial seleccionado o el estado sin selección en las exportaciones de equipos.
 
 #### Scenario: Exportación de candidatos
 - **WHEN** un administrador exporta candidatos
@@ -30,7 +38,7 @@ El sistema SHALL permitir que un administrador exporte el estado vigente en form
 
 #### Scenario: Exportación de equipos
 - **WHEN** un administrador exporta equipos
-- **THEN** el archivo incluye nombre del equipo, estado, integrantes aceptados, emails, condición FTCA y advertencias de validación
+- **THEN** el archivo incluye nombre del equipo, desafío seleccionado o estado sin selección, estado, integrantes aceptados, emails, condición FTCA y advertencias de validación
 
 #### Scenario: Exportación exitosa sin datos
 - **WHEN** el administrador exporta una vista que no contiene registros

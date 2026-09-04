@@ -11,6 +11,7 @@ import {
   candidateProjectionFields,
   collectionRulePatches,
   dataVersionField,
+  deliverablesDeadlineField,
   expectedFields,
   mentorProfilesCollection,
   mentorInvitationsCollection,
@@ -25,6 +26,7 @@ import {
   studentCertificateTimestampFields,
   teamChallengeField,
   teamMentorshipsCollection,
+  teamDeliverablesCollection,
 } from "./lomaton-schema.mjs";
 import {
   evaluationCyclesCollection,
@@ -32,6 +34,9 @@ import {
   juryEvaluationsCollection,
   jurorsCollection,
   juryUserField,
+  legacyEvaluationResultFieldNames,
+  makeFieldsOptional,
+  mergeMissingFields,
 } from "./jury-schema.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -284,6 +289,19 @@ const handlers = {
       actions.push("updated:teams_challenge");
     }
 
+    if (!byName.has("team_deliverables")) {
+      const teamsCollection = byName.get("teams");
+      const usersCollection = byName.get("users");
+      if (!teamsCollection || !usersCollection) {
+        throw rpcError(-32020, "Faltan teams o users antes de crear team_deliverables.");
+      }
+      const created = await pb.collections.create(
+        teamDeliverablesCollection(teamsCollection.id, usersCollection.id),
+      );
+      byName.set(created.name, created);
+      actions.push("created:team_deliverables");
+    }
+
     const registrationsForProfiles = byName.get("registrations");
     const usersForProfiles = byName.get("users");
     if (!registrationsForProfiles || !usersForProfiles) {
@@ -359,6 +377,35 @@ const handlers = {
       ));
       byName.set(created.name, created);
       actions.push("created:evaluation_results");
+    }
+
+    for (const definition of [
+      evaluationCyclesCollection(usersForEvaluation.id),
+      juryEvaluationsCollection(
+        byName.get("evaluation_cycles").id,
+        jurorsForUsers.id,
+        teamsForEvaluation.id,
+      ),
+      evaluationResultsCollection(byName.get("evaluation_cycles").id, teamsForEvaluation.id),
+    ]) {
+      const current = byName.get(definition.name);
+      const merged = mergeMissingFields(current.fields || [], definition.fields);
+      if (merged.added.length) {
+        const updated = await pb.collections.update(current.id, { fields: merged.fields });
+        byName.set(definition.name, updated);
+        actions.push(`updated:${definition.name}_planilla_v2`);
+      }
+    }
+
+    const currentResults = byName.get("evaluation_results");
+    const optionalizedResults = makeFieldsOptional(
+      currentResults.fields || [],
+      legacyEvaluationResultFieldNames,
+    );
+    if (optionalizedResults.changed) {
+      const updated = await pb.collections.update(currentResults.id, { fields: optionalizedResults.fields });
+      byName.set("evaluation_results", updated);
+      actions.push("updated:evaluation_results_v1_fields_optional");
     }
 
     if (!byName.has("mentor_invitations")) {
@@ -475,8 +522,12 @@ const handlers = {
       if (!current) throw rpcError(-32020, `Falta la colección requerida antes de aplicar reglas: ${name}`);
       const patch = { ...rules };
       if (name === "hackathon_settings") {
-        const hasDataVersion = current.fields?.some((field) => field.name === "dataVersion");
-        if (!hasDataVersion) patch.fields = [...current.fields, dataVersionField];
+        const fields = [...(current.fields || [])];
+        if (!fields.some((field) => field.name === "dataVersion")) fields.push(dataVersionField);
+        if (!fields.some((field) => field.name === deliverablesDeadlineField.name)) {
+          fields.push(deliverablesDeadlineField);
+        }
+        if (fields.length !== (current.fields || []).length) patch.fields = fields;
       }
       await pb.collections.update(current.id, patch);
       actions.push(`updated:${name}`);

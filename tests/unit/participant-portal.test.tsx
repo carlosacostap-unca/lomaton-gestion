@@ -9,6 +9,9 @@ vi.doMock("@/lib/pocketbase/client", () => ({ getBrowserPocketBase }));
 vi.doMock("@/app/candidate/student-certificate-card", () => ({
   StudentCertificateCard: () => <section>Certificado de alumno regular</section>,
 }));
+vi.doMock("@/app/candidate/team-deliverable-card", () => ({
+  TeamDeliverableCard: () => <section>Entrega del equipo</section>,
+}));
 
 const { ProfileForm } = await import("@/app/portal/profile-form");
 const { TeacherDashboard } = await import("@/app/portal/teacher-dashboard");

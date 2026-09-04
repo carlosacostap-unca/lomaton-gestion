@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 export const CERTIFICATE_STRUCTURAL_MAX_BYTES = 10 * 1024 * 1024;
+export const DELIVERABLE_STRUCTURAL_MAX_BYTES = 25 * 1024 * 1024;
 
 const serverEnvSchema = z.object({
   POCKETBASE_URL: z.url(),
@@ -16,6 +17,12 @@ const serverEnvSchema = z.object({
     .positive()
     .max(CERTIFICATE_STRUCTURAL_MAX_BYTES)
     .default(CERTIFICATE_STRUCTURAL_MAX_BYTES),
+  LOMATON_DELIVERABLE_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(DELIVERABLE_STRUCTURAL_MAX_BYTES)
+    .default(DELIVERABLE_STRUCTURAL_MAX_BYTES),
 });
 
 export type ServerEnv = {
@@ -25,6 +32,7 @@ export type ServerEnv = {
   importMaxBytes: number;
   importMaxRows: number;
   certificateMaxBytes: number;
+  deliverableMaxBytes: number;
 };
 
 export function parseServerEnv(input: Record<string, string | undefined>): ServerEnv {
@@ -47,6 +55,7 @@ export function parseServerEnv(input: Record<string, string | undefined>): Serve
     importMaxBytes: result.data.IMPORT_MAX_BYTES,
     importMaxRows: result.data.IMPORT_MAX_ROWS,
     certificateMaxBytes: result.data.LOMATON_CERTIFICATE_MAX_BYTES,
+    deliverableMaxBytes: result.data.LOMATON_DELIVERABLE_MAX_BYTES,
   };
 }
 
@@ -58,5 +67,6 @@ export function getServerEnv(): ServerEnv {
     IMPORT_MAX_BYTES: process.env.IMPORT_MAX_BYTES,
     IMPORT_MAX_ROWS: process.env.IMPORT_MAX_ROWS,
     LOMATON_CERTIFICATE_MAX_BYTES: process.env.LOMATON_CERTIFICATE_MAX_BYTES,
+    LOMATON_DELIVERABLE_MAX_BYTES: process.env.LOMATON_DELIVERABLE_MAX_BYTES,
   });
 }

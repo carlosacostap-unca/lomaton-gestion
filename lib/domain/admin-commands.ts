@@ -125,7 +125,13 @@ export function addAudit(
 export async function updateHackathonSettings(
   pb: PocketBase,
   admin: LomatonUser,
-  input: { deadlineUtc: string; formationOpen: boolean; reason: string },
+  input: {
+    deadlineUtc: string;
+    deliverablesDeadlineUtc?: string;
+    formationOpen: boolean;
+    reason: string;
+    confirmImmediateDeliverablesClosure?: boolean;
+  },
 ) {
   const current = await defaultSettings(pb);
   let deadlineUtc = "";
@@ -136,10 +142,38 @@ export async function updateHackathonSettings(
     }
     deadlineUtc = parsed.toISOString();
   }
+  let deliverablesDeadlineUtc = String(current.deliverablesDeadlineUtc ?? "");
+  if (input.deliverablesDeadlineUtc !== undefined) {
+    deliverablesDeadlineUtc = "";
+    if (input.deliverablesDeadlineUtc) {
+      const parsed = new Date(input.deliverablesDeadlineUtc);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new ApiError(
+          400,
+          "El plazo de entregas no es válido.",
+          "invalid_deliverables_deadline",
+        );
+      }
+      deliverablesDeadlineUtc = parsed.toISOString();
+      const changed = deliverablesDeadlineUtc !== String(current.deliverablesDeadlineUtc ?? "");
+      if (
+        changed &&
+        parsed.getTime() <= Date.now() &&
+        !input.confirmImmediateDeliverablesClosure
+      ) {
+        throw new ApiError(
+          409,
+          "El nuevo plazo cerraría las entregas inmediatamente. Confirmá expresamente para continuar.",
+          "deliverables_deadline_confirmation_required",
+        );
+      }
+    }
+  }
   const after = {
     id: current.id,
     key: "default",
     deadlineUtc,
+    deliverablesDeadlineUtc,
     timezone: "America/Argentina/Buenos_Aires",
     formationOpen: input.formationOpen,
   };
